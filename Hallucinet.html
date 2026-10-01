@@ -1,0 +1,3501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hallucinet — a browser for an internet that doesn't exist</title>
+<style>
+  :root{
+    --chrome:#22202b;
+    --chrome-2:#2e2b39;
+    --chrome-3:#3b3749;
+    --ink:#e9e6f2;
+    --ink-dim:#a49fb8;
+    --field:#15131c;
+    --page:#ffffff;
+    --accent:#7b5cff;
+    --accent-2:#00c2a8;
+    --warn:#ff7a59;
+    --ok:#3ddc97;
+    --radius:9px;
+    --ui: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    font-family:var(--ui);
+    background:var(--chrome);
+    color:var(--ink);
+    display:flex;flex-direction:column;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{
+    outline:2px solid var(--accent-2);outline-offset:2px;border-radius:4px
+  }
+
+  /* ---------- tab strip ---------- */
+  .tabstrip{display:flex;align-items:flex-end;gap:2px;padding:7px 8px 0;background:var(--chrome);flex:none}
+  .tab{
+    display:flex;align-items:center;gap:8px;
+    min-width:0;max-width:230px;flex:1 1 180px;
+    height:34px;padding:0 6px 0 12px;
+    background:var(--chrome-2);color:var(--ink-dim);
+    border-radius:10px 10px 0 0;font-size:12.5px;
+    cursor:default;user-select:none;
+  }
+  .tab.active{background:var(--chrome-3);color:var(--ink)}
+  .tab .fav{flex:none;font-size:13px;line-height:1}
+  .tab .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tab .x{flex:none;width:20px;height:20px;border-radius:50%;font-size:14px;line-height:18px;opacity:.6}
+  .tab .x:hover{background:rgba(255,255,255,.14);opacity:1}
+  .newtab{width:30px;height:30px;border-radius:50%;font-size:17px;color:var(--ink-dim);margin:0 0 3px 4px}
+  .newtab:hover{background:rgba(255,255,255,.1);color:var(--ink)}
+
+  /* ---------- toolbar ---------- */
+  .toolbar{display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--chrome-3);flex:none}
+  .nav{width:32px;height:32px;border-radius:50%;font-size:15px;color:var(--ink);display:grid;place-items:center}
+  .nav:hover:not(:disabled){background:rgba(255,255,255,.1)}
+  .nav:disabled{opacity:.3;cursor:default}
+  .omnibox{
+    flex:1;display:flex;align-items:center;gap:8px;
+    height:34px;padding:0 12px;background:var(--field);
+    border-radius:18px;border:1px solid transparent;min-width:0;
+  }
+  .omnibox:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(123,92,255,.22)}
+  .omnibox .lock{font-size:11px;color:var(--ink-dim);flex:none}
+  .omnibox input{
+    flex:1;min-width:0;background:none;border:0;outline:0;
+    color:var(--ink);font-size:13.5px;font-family:inherit;
+  }
+  .omnibox input::placeholder{color:#6f6a84}
+  .hist-wrap{position:relative;flex:none}
+  .hist{width:32px;height:32px;border-radius:50%;font-size:14px;color:var(--ink-dim);display:grid;place-items:center}
+  .hist:hover{background:rgba(255,255,255,.1);color:var(--ink)}
+  .hist.on{color:var(--ink);background:rgba(123,92,255,.22)}
+  .histpanel{
+    display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:40;
+    width:320px;max-height:420px;overflow:auto;
+    background:var(--chrome-3);border:1px solid #4c4760;border-radius:12px;
+    box-shadow:0 16px 34px rgba(10,8,16,.45);padding:8px;
+  }
+  .histpanel.show{display:block}
+  .hist-head{display:flex;align-items:center;justify-content:space-between;padding:8px 10px 10px;font-size:12px;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-dim)}
+  .hist-clear{font-size:11.5px;color:var(--ink-dim);text-transform:none;letter-spacing:0;padding:2px 4px;border-radius:5px}
+  .hist-clear:hover{color:var(--ink);background:rgba(255,255,255,.08)}
+  .hist-empty{padding:20px 10px;font-size:12.5px;color:var(--ink-dim);text-align:center}
+  .hist-list{display:flex;flex-direction:column;gap:2px}
+  .hist-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer}
+  .hist-item:hover{background:rgba(255,255,255,.08)}
+  .hist-ic{flex:none;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.08);display:grid;place-items:center;font-size:13px}
+  .hist-txt{min-width:0;flex:1}
+  .hist-title{font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hist-url{font-size:11.5px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .hist-x{flex:none;width:22px;height:22px;border-radius:50%;font-size:13px;color:var(--ink-dim);display:grid;place-items:center;opacity:0}
+  .hist-item:hover .hist-x{opacity:1}
+  .hist-x:hover{background:rgba(255,122,89,.2);color:var(--warn)}
+  .hist-item.hist-domain{position:relative}
+  .hist-domain .hist-count{flex:none;font-size:11px;color:var(--ink-dim);background:rgba(255,255,255,.08);border-radius:20px;padding:2px 8px;margin-right:2px}
+  .hist-domain.active{background:rgba(255,255,255,.08)}
+  .hist-flyout{
+    position:fixed;z-index:60;width:280px;max-height:360px;overflow:auto;
+    background:var(--chrome-3);border:1px solid #4c4760;border-radius:12px;
+    box-shadow:0 16px 34px rgba(10,8,16,.45);padding:6px;display:none;
+  }
+  .hist-flyout.show{display:block}
+  .hist-flyout-head{padding:6px 8px 8px;font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-dim)}
+  .hist-sub-item{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;cursor:pointer}
+  .hist-sub-item:hover{background:rgba(255,255,255,.08)}
+  .hist-sub-ic{flex:none;font-size:11px;color:var(--ink-dim);width:14px;text-align:center}
+  .hist-sub-txt{min-width:0;flex:1}
+  .hist-sub-title{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hist-sub-url{font-size:11px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .hist-sub-x{flex:none;width:20px;height:20px;border-radius:50%;font-size:12px;color:var(--ink-dim);display:grid;place-items:center;opacity:0}
+  .hist-sub-item:hover .hist-sub-x{opacity:1}
+  .hist-sub-x:hover{background:rgba(255,122,89,.2);color:var(--warn)}
+  .status{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-dim);white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;background:#6f6a84}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px rgba(61,220,151,.7)}
+  .dot.off{background:var(--warn)}
+  .gear{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:15px}
+  .gear:hover{background:rgba(255,255,255,.1)}
+
+  .omnibox .star{flex:none;width:26px;height:26px;border-radius:50%;font-size:14px;color:var(--ink-dim);display:grid;place-items:center;margin-left:2px}
+  .omnibox .star:hover:not(:disabled){background:rgba(255,255,255,.12);color:var(--ink)}
+  .omnibox .star:disabled{opacity:.35;cursor:default}
+  .omnibox .star.on{color:#ffb020}
+
+  /* ---------- bookmarks bar ---------- */
+  .bookmarksbar{display:flex;align-items:center;gap:4px;padding:5px 10px;background:var(--chrome-3);
+    border-top:1px solid rgba(255,255,255,.06);flex:none;overflow-x:auto;scrollbar-width:none}
+  .bookmarksbar::-webkit-scrollbar{display:none}
+  .bookmarksbar.empty{padding:0;border-top:0;height:0;overflow:hidden}
+  .bm{display:flex;align-items:center;gap:6px;height:26px;padding:0 6px 0 9px;border-radius:6px;
+    background:rgba(255,255,255,.05);color:var(--ink-dim);font-size:12px;white-space:nowrap;flex:none;
+    max-width:170px;cursor:pointer}
+  .bm:hover{background:rgba(255,255,255,.1);color:var(--ink)}
+  .bm .bm-ic{flex:none;font-size:12px;line-height:1}
+  .bm .bm-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bm .bm-x{flex:none;width:16px;height:16px;border-radius:50%;font-size:11px;color:var(--ink-dim);
+    display:grid;place-items:center;opacity:0}
+  .bm:hover .bm-x{opacity:.75}
+  .bm .bm-x:hover{opacity:1;background:rgba(255,122,89,.25);color:var(--warn)}
+
+  /* ---------- progress ---------- */
+  .progress{height:2px;background:transparent;flex:none;overflow:hidden}
+  .progress.busy{background:rgba(255,255,255,.08)}
+  .progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .3s ease}
+
+  /* ---------- viewport ---------- */
+  .viewport{flex:1;position:relative;background:var(--page);min-height:0}
+  .viewport iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+  .layer{position:absolute;inset:0;overflow:auto;background:#fff;color:#1c1a24;display:none}
+  .layer.show{display:block}
+  .fab{
+    display:none;align-items:center;gap:8px;
+    position:absolute;right:18px;bottom:18px;z-index:5;
+    padding:11px 18px;border-radius:999px;
+    background:var(--chrome-3);color:var(--ink);border:1px solid #4c4760;
+    font-size:13px;font-weight:600;letter-spacing:.01em;
+    box-shadow:0 10px 28px rgba(20,16,30,.4);
+    transition:transform .12s ease, background .15s, opacity .15s;
+  }
+  .fab.show{display:flex}
+  .fab:hover:not(:disabled){background:var(--accent);border-color:transparent;transform:translateY(-1px)}
+  .fab:disabled{opacity:.65;cursor:default;transform:none}
+  .fab .plus{font-size:15px;line-height:1}
+  .fab .spin{display:inline-block;width:11px;height:11px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:fabspin .7s linear infinite}
+  @keyframes fabspin{to{transform:rotate(360deg)}}
+
+  /* ---------- home / search engine ---------- */
+  .mark{font-weight:800;letter-spacing:-.04em;line-height:1;user-select:none}
+  .mark i{font-style:normal}
+  .mark .c1{color:#7b5cff}.mark .c2{color:#00c2a8}.mark .c3{color:#ff7a59}
+  .mark .c4{color:#ffb020}.mark .c5{color:#e8437f}.mark .c6{color:#2f6bff}
+
+  .home{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px 90px;gap:26px}
+  .home .mark{font-size:clamp(46px,9vw,80px)}
+  .home .tagline{color:#6b6880;font-size:13.5px;margin-top:-14px}
+  .searchbar{
+    width:min(580px,92vw);display:flex;align-items:center;gap:12px;
+    height:48px;padding:0 18px;border:1px solid #dcd9e6;border-radius:24px;background:#fff;
+    box-shadow:0 1px 6px rgba(32,28,56,.08);
+  }
+  .searchbar:focus-within{border-color:#c3bce0;box-shadow:0 2px 14px rgba(32,28,56,.14)}
+  .searchbar input{flex:1;min-width:0;border:0;outline:0;font-size:15.5px;font-family:inherit;color:#1c1a24;background:none}
+  .searchbar .ic{color:#8b87a0;font-size:15px}
+  .home-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .btn{
+    padding:9px 18px;border-radius:7px;background:#f3f1f9;color:#3a3550;
+    font-size:13.5px;border:1px solid #e6e3f0;
+  }
+  .btn:hover{background:#ece9f7;border-color:#d6d1ea}
+  .btn.primary{background:var(--accent);color:#fff;border-color:transparent}
+  .btn.primary:hover{background:#6b4bf5}
+  .home .note{max-width:520px;text-align:center;font-size:12.5px;color:#8b87a0;line-height:1.6}
+  .offline{
+    width:min(580px,92vw);background:#fff6f2;border:1px solid #ffd9cc;color:#8a3b1c;
+    border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.65
+  }
+  .offline code{background:#ffe9e0;padding:1px 5px;border-radius:4px;font-size:12px}
+
+  /* ---------- results ---------- */
+  .results-head{position:sticky;top:0;background:#fff;border-bottom:1px solid #eceaf3;z-index:2}
+  .rh-row{display:flex;align-items:center;gap:22px;padding:14px 26px 0;max-width:1180px}
+  .rh-row .mark{font-size:24px;cursor:pointer}
+  .rh-row .searchbar{height:42px;width:min(560px,60vw)}
+  .rh-tabs{display:flex;gap:26px;padding:12px 26px 0 152px;font-size:13px;color:#6b6880}
+  .rh-tabs span{padding-bottom:9px;border-bottom:3px solid transparent}
+  .rh-tabs span.sel{color:var(--accent);border-color:var(--accent)}
+  .results-wrap{display:flex;gap:44px;padding:20px 26px 70px 152px;max-width:1180px;align-items:flex-start;flex-wrap:wrap}
+  .results{flex:1 1 520px;min-width:300px;max-width:640px}
+  .stat{color:#8b87a0;font-size:12.5px;margin-bottom:22px}
+  .result{margin-bottom:28px}
+  .result .crumb{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#4d4a60;margin-bottom:3px}
+  .result .crumb .fav{
+    width:22px;height:22px;border-radius:50%;background:#f1eff8;display:grid;place-items:center;font-size:12px;flex:none
+  }
+  .result h3{margin:0 0 4px;font-size:19px;font-weight:500;line-height:1.3}
+  .result h3 a{color:#3b2fb8;text-decoration:none;cursor:pointer}
+  .result h3 a:hover{text-decoration:underline}
+  .result p{margin:0;font-size:13.8px;line-height:1.62;color:#4d4a60}
+  .answer{
+    border:1px solid #e6e3f0;border-radius:12px;padding:16px 18px;margin-bottom:26px;background:#fbfaff
+  }
+  .answer h4{margin:0 0 6px;font-size:14px;color:#3a3550}
+  .answer p{margin:0;font-size:14px;line-height:1.65;color:#2c2940}
+  .panel{flex:0 1 320px;border:1px solid #e6e3f0;border-radius:12px;padding:18px;background:#fff}
+  .panel h4{margin:0 0 2px;font-size:19px;font-weight:600}
+  .panel .sub{color:#8b87a0;font-size:12.5px;margin-bottom:12px}
+  .panel ul{margin:0;padding:0;list-style:none}
+  .panel li{font-size:13px;line-height:1.6;color:#4d4a60;padding:7px 0;border-top:1px solid #f1eff8}
+  .related{margin-top:34px}
+  .related h4{font-size:15px;margin:0 0 12px;color:#3a3550;font-weight:600}
+  .related div{display:flex;flex-wrap:wrap;gap:10px}
+  .related button{
+    padding:8px 14px;border-radius:20px;background:#f3f1f9;font-size:13px;color:#3b2fb8;border:1px solid #e6e3f0
+  }
+  .related button:hover{background:#ece9f7}
+  .skel{height:13px;border-radius:5px;background:linear-gradient(90deg,#f1eff8,#e7e4f2,#f1eff8);background-size:200% 100%;animation:sh 1.1s linear infinite;margin-bottom:9px}
+  @keyframes sh{to{background-position:-200% 0}}
+  @media (prefers-reduced-motion:reduce){.skel{animation:none}}
+
+  .errbox{margin:60px auto;max-width:560px;padding:22px;border:1px solid #ffd9cc;background:#fff6f2;border-radius:12px;color:#8a3b1c;font-size:13.5px;line-height:1.7}
+  .errbox h3{margin:0 0 8px;font-size:16px}
+
+  /* ---------- settings window ---------- */
+  .scrim{
+    position:fixed;inset:0;z-index:50;display:none;
+    align-items:center;justify-content:center;padding:24px;
+    background:rgba(14,12,20,.62);
+  }
+  .scrim.show{display:flex}
+  .modal{
+    display:flex;flex-direction:column;
+    width:min(880px,100%);height:min(680px,100%);
+    background:var(--chrome-3);color:var(--ink);
+    border:1px solid #4c4760;border-radius:14px;overflow:hidden;
+    box-shadow:0 28px 70px rgba(0,0,0,.55);
+  }
+  .scrim.show .modal{animation:modalin .16s ease-out}
+  @keyframes modalin{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.scrim.show .modal{animation:none}}
+
+  .modal-head{
+    flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+    padding:16px 16px 14px 24px;border-bottom:1px solid #4c4760;
+  }
+  .modal-head h2{margin:0;font-size:17px;font-weight:600}
+  .modal-head p{margin:3px 0 0;font-size:12.5px;color:var(--ink-dim)}
+  .modal-x{
+    flex:none;width:34px;height:34px;border-radius:50%;
+    display:grid;place-items:center;font-size:22px;line-height:1;color:var(--ink-dim);
+  }
+  .modal-x:hover{background:rgba(255,255,255,.12);color:var(--ink)}
+
+  .modal-main{flex:1;min-height:0;display:flex}
+  .set-nav{
+    flex:none;width:196px;padding:12px 10px;overflow:auto;
+    display:flex;flex-direction:column;gap:2px;
+    background:var(--chrome-2);border-right:1px solid #4c4760;
+  }
+  .set-tab{
+    display:flex;align-items:center;gap:10px;width:100%;
+    padding:9px 12px;border-radius:8px;text-align:left;
+    font-size:13.5px;color:var(--ink-dim);
+  }
+  .set-tab .gl{flex:none;width:18px;text-align:center;font-size:14px}
+  .set-tab:hover{background:rgba(255,255,255,.07);color:var(--ink)}
+  .set-tab.on{background:rgba(123,92,255,.26);color:var(--ink);font-weight:600}
+
+  .set-body{flex:1;min-width:0;overflow:auto;padding:24px 28px 30px}
+  .set-pane{display:none;max-width:560px}
+  .set-pane.show{display:block}
+  .pane-head{margin-bottom:22px}
+  .pane-head h3{margin:0 0 4px;font-size:16px;font-weight:600}
+  .pane-head p{margin:0;font-size:12.5px;line-height:1.6;color:var(--ink-dim)}
+
+  .modal-foot{
+    flex:none;display:flex;align-items:center;gap:16px;
+    padding:12px 20px 12px 24px;border-top:1px solid #4c4760;background:var(--chrome-2);
+  }
+  .set-msg{flex:1;min-width:0;margin:0;font-size:12.5px;line-height:1.5;color:var(--ink-dim)}
+  .modal-foot .btn.primary{flex:none;padding-left:26px;padding-right:26px}
+
+  .modal .off{display:none !important}
+  .field{margin-bottom:18px}
+  .field label{display:block;font-size:12.5px;color:var(--ink-dim);margin-bottom:6px}
+  .field input[type=text],.field input[type=password],.field select,.field textarea{
+    width:100%;padding:9px 11px;border-radius:7px;border:1px solid #4c4760;
+    background:var(--field);color:var(--ink);font-size:13px;font-family:inherit
+  }
+  .field textarea{min-height:120px;resize:vertical;line-height:1.55}
+  .field input[type=range]{width:100%;accent-color:var(--accent)}
+  .row{display:flex;gap:14px}
+  .row>*{flex:1;min-width:0}
+  .modal .btn{background:var(--chrome-2);border-color:#4c4760;color:var(--ink)}
+  .modal .btn:hover{background:#464158}
+  .modal .btn.primary{background:var(--accent);color:#fff;border-color:transparent}
+  .modal .btn.primary:hover{background:#6b4bf5}
+  .modal .btn.danger:hover{background:rgba(255,122,89,.18);border-color:var(--warn);color:var(--warn)}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+  .val{float:right;color:var(--ink);font-variant-numeric:tabular-nums}
+  .mini{font-size:11px;color:var(--accent-2);text-transform:lowercase;letter-spacing:.02em}
+  .mini:hover{text-decoration:underline}
+  .hint{margin:0;color:var(--ink-dim);font-size:12.5px;line-height:1.6}
+  .hint.tiny{font-size:11.5px;margin:6px 0 0;line-height:1.5}
+  .modal .subhead{
+    margin:26px 0 14px;padding-top:18px;border-top:1px solid #4c4760;
+    font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);
+  }
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:14px;cursor:pointer}
+  .toggle-row .ttxt{font-size:12.5px;color:var(--ink-dim);line-height:1.5}
+  .toggle-row .ttxt b{color:var(--ink);font-weight:600}
+  .toggle{position:relative;flex:none;width:38px;height:22px}
+  .toggle input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+  .toggle .slider{position:absolute;inset:0;background:#4c4760;border-radius:999px;transition:background .15s}
+  .toggle .slider::before{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+  .toggle input:checked + .slider{background:var(--accent)}
+  .toggle input:checked + .slider::before{transform:translateX(16px)}
+  .toggle input:focus-visible + .slider{outline:2px solid var(--accent-2);outline-offset:2px}
+
+  @media (max-width:660px){
+    .scrim{padding:0}
+    .modal{height:100%;border-radius:0;border:0}
+    .modal-main{flex-direction:column}
+    .set-nav{width:auto;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:8px;border-right:0;border-bottom:1px solid #4c4760}
+    .set-tab{width:auto;white-space:nowrap;padding:8px 12px}
+    .set-body{padding:18px 18px 26px}
+    .row{flex-direction:column;gap:0}
+    .modal-foot{padding:12px 16px}
+  }
+</style>
+</head>
+<body>
+
+<div class="tabstrip" id="tabstrip"></div>
+
+<div class="toolbar">
+  <button class="nav" id="back" title="Back">←</button>
+  <button class="nav" id="fwd" title="Forward">→</button>
+  <button class="nav" id="reload" title="Reload (Shift-click to redesign this whole site)">⟳</button>
+  <div class="omnibox">
+    <span class="lock" id="lock">🔒</span>
+    <input id="url" spellcheck="false" autocomplete="off" placeholder="Search Hallucinet or type a made-up address">
+    <button class="star" id="starBtn" title="Bookmark this page">☆</button>
+  </div>
+  <div class="hist-wrap">
+    <button class="hist" id="histBtn" title="History">🕐</button>
+    <div class="histpanel" id="histPanel">
+      <div class="hist-head"><span>History</span><button class="hist-clear" id="histClear">Clear</button></div>
+      <div class="hist-list" id="histList"></div>
+      <div class="hist-empty" id="histEmpty">No pages cached yet.</div>
+    </div>
+    <div class="hist-flyout" id="histFlyout"></div>
+  </div>
+  <div class="status" id="status"><span class="dot" id="dot"></span><span id="statusText">connecting…</span></div>
+  <button class="gear" id="gear" title="Settings">⚙</button>
+</div>
+
+<div class="bookmarksbar" id="bookmarksBar"></div>
+
+<div class="progress" id="progress"><i></i></div>
+
+<div class="viewport">
+  <iframe id="frame" title="Page" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-modals"></iframe>
+  <div class="layer" id="layer"></div>
+  <button class="fab" id="genMoreBtn" type="button">
+    <span class="plus" id="genMoreIcon">＋</span><span id="genMoreLabel">Generate more</span>
+  </button>
+</div>
+
+<!-- ================= settings window ================= -->
+<div class="scrim" id="scrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+
+    <header class="modal-head">
+      <div>
+        <h2 id="setTitle">Settings</h2>
+        <p>Choose the model that writes pages and what kind of internet it invents.</p>
+      </div>
+      <button class="modal-x" id="closeSheet" type="button" aria-label="Close settings" title="Close">×</button>
+    </header>
+
+    <div class="modal-main">
+      <nav class="set-nav" id="setNav" role="tablist" aria-orientation="vertical" aria-label="Settings categories">
+        <button type="button" class="set-tab on" role="tab" id="tab-model" data-tab="model" aria-controls="pane-model" aria-selected="true"><span class="gl">🤖</span>Model</button>
+        <button type="button" class="set-tab" role="tab" id="tab-generation" data-tab="generation" aria-controls="pane-generation" aria-selected="false" tabindex="-1"><span class="gl">🎛</span>Generation</button>
+        <button type="button" class="set-tab" role="tab" id="tab-world" data-tab="world" aria-controls="pane-world" aria-selected="false" tabindex="-1"><span class="gl">🌐</span>World</button>
+        <button type="button" class="set-tab" role="tab" id="tab-images" data-tab="images" aria-controls="pane-images" aria-selected="false" tabindex="-1"><span class="gl">🖼</span>Images</button>
+        <button type="button" class="set-tab" role="tab" id="tab-video" data-tab="video" aria-controls="pane-video" aria-selected="false" tabindex="-1"><span class="gl">🎬</span>Video</button>
+        <button type="button" class="set-tab" role="tab" id="tab-data" data-tab="data" aria-controls="pane-data" aria-selected="false" tabindex="-1"><span class="gl">🗂</span>Data</button>
+      </nav>
+
+      <div class="set-body" id="setBody">
+
+        <!-- Model -->
+        <section class="set-pane show" role="tabpanel" id="pane-model" data-pane="model" aria-labelledby="tab-model">
+          <div class="pane-head">
+            <h3>Model</h3>
+            <p id="provHint">Pages come from whichever model you point this at — a local one in LM Studio or Ollama, or a hosted API.</p>
+          </div>
+
+          <div class="field">
+            <label for="provider">Provider</label>
+            <select id="provider"></select>
+          </div>
+
+          <div class="field" id="keyField">
+            <label for="apiKey">API key <span class="val"><button type="button" class="mini" id="revealKey">show</button></span></label>
+            <input type="password" id="apiKey" spellcheck="false" autocomplete="off" placeholder="sk-…">
+            <p class="hint tiny">Stored only in this browser's local storage, and sent straight to the provider from this page.</p>
+          </div>
+
+          <div class="field">
+            <label for="baseUrl">Endpoint <span class="val"><button type="button" class="mini" id="resetUrl">reset</button></span></label>
+            <input type="text" id="baseUrl" spellcheck="false">
+          </div>
+
+          <div class="field">
+            <label for="model">Model <span class="val"><button type="button" class="mini" id="refreshModels">refresh list</button></span></label>
+            <input type="text" id="model" spellcheck="false" autocomplete="off" list="modelList" placeholder="model id">
+            <datalist id="modelList"></datalist>
+            <p class="hint tiny" id="modelHint">Pick from the list or type any model id the endpoint accepts.</p>
+          </div>
+
+          <div class="btn-row">
+            <button type="button" class="btn" id="testBtn">Test connection</button>
+          </div>
+        </section>
+
+        <!-- Generation -->
+        <section class="set-pane" role="tabpanel" id="pane-generation" data-pane="generation" aria-labelledby="tab-generation">
+          <div class="pane-head">
+            <h3>Generation</h3>
+            <p>How much the model invents, and how much it writes per page.</p>
+          </div>
+
+          <div class="field">
+            <label for="temp">Imagination <span class="val" id="tempVal">0.8</span></label>
+            <input type="range" id="temp" min="0" max="1.5" step="0.05">
+            <p class="hint tiny">Higher values give stranger, more surprising pages. Lower values stay predictable.</p>
+          </div>
+
+          <div class="field">
+            <label for="maxTok">Page length <span class="val" id="maxTokVal">2000</span></label>
+            <input type="range" id="maxTok" min="600" max="12000" step="200">
+            <p class="hint tiny">The most tokens the model may write for one page. Longer pages take longer to appear.</p>
+          </div>
+
+          <div class="subhead">Performance</div>
+          <div class="field">
+            <label class="toggle-row" for="liteMode">
+              <span class="ttxt"><b>Lite mode</b><br>Shorter prompts, simpler pages, fewer tokens — for small local models.</span>
+              <span class="toggle"><input type="checkbox" id="liteMode"><span class="slider"></span></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- World -->
+        <section class="set-pane" role="tabpanel" id="pane-world" data-pane="world" aria-labelledby="tab-world">
+          <div class="pane-head">
+            <h3>World</h3>
+            <p>The tone and character of the internet this browser writes.</p>
+          </div>
+
+          <div class="field">
+            <label for="flavor">What is this internet like?</label>
+            <textarea id="flavor" spellcheck="false"></textarea>
+          </div>
+
+          <div class="subhead">Search results</div>
+          <div class="row">
+            <div class="field">
+              <label for="resMin">Min results <span class="val" id="resMinVal">6</span></label>
+              <input type="range" id="resMin" min="1" max="10" step="1">
+            </div>
+            <div class="field">
+              <label for="resMax">Max results <span class="val" id="resMaxVal">8</span></label>
+              <input type="range" id="resMax" min="1" max="10" step="1">
+            </div>
+          </div>
+          <p class="hint">The model picks a count in this range each search. Lower it for faster, cheaper responses.</p>
+        </section>
+
+        <!-- Images -->
+        <section class="set-pane" role="tabpanel" id="pane-images" data-pane="images" aria-labelledby="tab-images">
+          <div class="pane-head">
+            <h3>Images</h3>
+            <p>Where pictures on generated pages come from.</p>
+          </div>
+
+          <div class="field">
+            <label for="imgProvider">Image API</label>
+            <select id="imgProvider"></select>
+            <p class="hint tiny" id="imgHint"></p>
+          </div>
+          <div class="field" id="imgKeyField">
+            <label for="imgKey">Image API key</label>
+            <input type="password" id="imgKey" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="row" id="imgDetail">
+            <div class="field">
+              <label for="imgBase">Endpoint</label>
+              <input type="text" id="imgBase" spellcheck="false">
+            </div>
+            <div class="field">
+              <label for="imgModel" id="imgModelLabel">Image model</label>
+              <input type="text" id="imgModel" spellcheck="false">
+            </div>
+          </div>
+          <div class="field" id="imgPerField">
+            <label for="imgPer">Images per page <span class="val" id="imgPerVal">3</span></label>
+            <input type="range" id="imgPer" min="0" max="8" step="1">
+          </div>
+        </section>
+
+        <!-- Video -->
+        <section class="set-pane" role="tabpanel" id="pane-video" data-pane="video" aria-labelledby="tab-video">
+          <div class="pane-head">
+            <h3>Video</h3>
+            <p>Where clips come from. Each clip loads only when you press play.</p>
+          </div>
+
+          <div class="field">
+            <label for="vidProvider">Video API</label>
+            <select id="vidProvider"></select>
+            <p class="hint tiny" id="vidHint"></p>
+          </div>
+          <div class="field" id="vidKeyField">
+            <label for="vidKey">Video API key</label>
+            <input type="password" id="vidKey" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="row" id="vidDetail">
+            <div class="field">
+              <label for="vidBase">Endpoint</label>
+              <input type="text" id="vidBase" spellcheck="false">
+            </div>
+            <div class="field">
+              <label for="vidModel" id="vidModelLabel">Video model</label>
+              <input type="text" id="vidModel" spellcheck="false">
+            </div>
+          </div>
+        </section>
+
+        <!-- Data -->
+        <section class="set-pane" role="tabpanel" id="pane-data" data-pane="data" aria-labelledby="tab-data">
+          <div class="pane-head">
+            <h3>Data</h3>
+            <p>Pages, site designs and pictures are saved in this browser so revisits are instant.</p>
+          </div>
+
+          <p class="hint" id="dataStats" style="margin-bottom:16px"></p>
+          <div class="btn-row">
+            <button type="button" class="btn danger" id="wipeBtn">Clear cache &amp; sites</button>
+          </div>
+          <p class="hint tiny">Removes saved pages, site designs (including each site's saved header, footer and stylesheet) and generated pictures. Your settings and API keys stay. To redesign just one site, Shift-click the reload button while on it.</p>
+
+          <div class="subhead">Export / import this internet</div>
+          <div class="field">
+            <label for="exportFolder">Folder name for the download</label>
+            <input type="text" id="exportFolder" spellcheck="false" placeholder="latent-internet">
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn" id="exportBtn">Download as .html files</button>
+            <button type="button" class="btn" id="importBtn">Upload a folder</button>
+            <input type="file" id="importInput" webkitdirectory directory multiple accept=".html,.htm" style="display:none">
+          </div>
+          <p class="hint tiny">Download saves every cached page as a real, plain <code>.html</code> file, each one named for its site and placed inside the folder name above (a browser download can't be pointed at an arbitrary drive letter, so it lands in your normal Downloads folder). Upload reads every <code>.html</code> file out of a folder you pick and caches it as a visited page — the original files aren't needed afterward.</p>
+          <p class="hint tiny" id="exportMsg" style="min-height:16px"></p>
+
+          <div class="subhead">Domain templates</div>
+          <div class="field">
+            <p class="hint">Point this at a folder of your own <code>.html</code> files — one per domain (e.g. <code>instagram.com.html</code>), or a subfolder per domain with an <code>index.html</code> inside — and Latent will use that file as the real header/footer/stylesheet for that domain instead of inventing one, the same way it reuses a site's own shell. Saves tokens and speeds up every page on that domain. Browsers won't let a webpage read a typed-out path like <code>D:\Projects\oldinternet</code> without you picking it — use the button below to grant access.</p>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn" id="tplBtn">Choose templates folder…</button>
+          </div>
+          <p class="hint tiny" id="tplMsg" style="min-height:16px"></p>
+        </section>
+
+      </div>
+    </div>
+
+    <footer class="modal-foot">
+      <p class="set-msg" id="sheetMsg" role="status" aria-live="polite"></p>
+      <button type="button" class="btn primary" id="saveBtn">Save settings</button>
+    </footer>
+
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   Latent — a browser whose internet is generated on demand.
+   Everything below is one file: state, multi-provider model client,
+   renderer, and the fake web it draws.
+   ========================================================= */
+
+const HOME = "about:home";
+const ENGINE = "https://hallucinet.com";
+const store = (() => {
+  try { localStorage.setItem("__t","1"); localStorage.removeItem("__t");
+        return localStorage; } catch(e){ const m={}; return {
+        getItem:k=>k in m?m[k]:null, setItem:(k,v)=>{m[k]=String(v)}, removeItem:k=>{delete m[k]} }; }
+})();
+
+/* ---------------- bookmarks ---------------- */
+let bookmarks = [];
+try { bookmarks = JSON.parse(store.getItem("latent.bookmarks") || "[]"); } catch(e){ bookmarks = []; }
+function saveBookmarks(){ store.setItem("latent.bookmarks", JSON.stringify(bookmarks)); }
+function findBookmark(url){ return bookmarks.find(b => b.url === url); }
+function isBookmarked(url){ return !!findBookmark(url); }
+function addBookmark(url, title, fav){
+  if (!url || url === HOME || isBookmarked(url)) return;
+  bookmarks.push({url, title: (title || hostOf(url)).slice(0, 60), fav: fav || "◉"});
+  saveBookmarks(); renderBookmarksBar(); updateStar();
+}
+function removeBookmark(url){
+  const i = bookmarks.findIndex(b => b.url === url);
+  if (i === -1) return;
+  bookmarks.splice(i, 1);
+  saveBookmarks(); renderBookmarksBar(); updateStar();
+}
+function toggleBookmark(){
+  const url = currentUrl();
+  if (url === HOME) return;
+  if (isBookmarked(url)) removeBookmark(url);
+  else addBookmark(url, current().title, current().fav);
+}
+function renderBookmarksBar(){
+  const bar = document.getElementById("bookmarksBar");
+  if (!bar) return;
+  bar.classList.toggle("empty", bookmarks.length === 0);
+  bar.innerHTML = "";
+  bookmarks.forEach(b => {
+    const el = document.createElement("div");
+    el.className = "bm";
+    el.title = b.url;
+    el.innerHTML = `<span class="bm-ic"></span><span class="bm-t"></span><button class="bm-x" title="Remove bookmark">×</button>`;
+    el.querySelector(".bm-ic").textContent = b.fav || "◉";
+    el.querySelector(".bm-t").textContent = b.title || hostOf(b.url);
+    el.onclick = e => { if (e.target.closest(".bm-x")) return; go(b.url); };
+    el.querySelector(".bm-x").onclick = e => { e.stopPropagation(); removeBookmark(b.url); };
+    bar.appendChild(el);
+  });
+}
+function updateStar(){
+  const btn = document.getElementById("starBtn");
+  if (!btn) return;
+  const url = currentUrl();
+  const bookmarkable = url !== HOME;
+  btn.disabled = !bookmarkable;
+  const on = bookmarkable && isBookmarked(url);
+  btn.classList.toggle("on", on);
+  btn.textContent = on ? "★" : "☆";
+  btn.title = !bookmarkable ? "Nothing to bookmark yet" : (on ? "Remove bookmark" : "Bookmark this page");
+}
+
+/* ---------------- providers ----------------
+   Three request shapes cover everything here:
+     "openai"    — /chat/completions, Bearer key (LM Studio, Ollama, OpenAI,
+                   OpenRouter, Groq, DeepSeek, Mistral, xAI, Together, …)
+     "anthropic" — /messages, x-api-key + version header, system as its own field
+     "gemini"    — /models/{id}:generateContent, key in the query string
+   Anything OpenAI-shaped that isn't listed works under "Custom (OpenAI-compatible)".
+------------------------------------------------ */
+const PROVIDERS = {
+  lmstudio: {
+    label: "LM Studio (local)", style: "openai", baseUrl: "http://localhost:1234/v1",
+    needsKey: false, canList: true,
+    note: "Start the server in LM Studio (Developer → Start Server), load a model, and switch CORS on — otherwise the browser blocks these requests."
+  },
+  ollama: {
+    label: "Ollama (local)", style: "openai", baseUrl: "http://localhost:11434/v1",
+    needsKey: false, canList: true,
+    note: "Ollama must be running with browser origins allowed, e.g. OLLAMA_ORIGINS=* ollama serve."
+  },
+  llamacpp: {
+    label: "llama.cpp / llama-server (local)", style: "openai", baseUrl: "http://localhost:8080/v1",
+    needsKey: false, canList: true,
+    note: "Run llama-server with a model loaded. It answers on the OpenAI-compatible /v1 routes."
+  },
+  openai: {
+    label: "OpenAI", style: "openai", baseUrl: "https://api.openai.com/v1",
+    needsKey: true, canList: true, keyHint: "Key from platform.openai.com → API keys.",
+    fallback: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"]
+  },
+  anthropic: {
+    label: "Anthropic (Claude)", style: "anthropic", baseUrl: "https://api.anthropic.com/v1",
+    needsKey: true, canList: true, maxTemp: 1,
+    keyHint: "Key from console.anthropic.com. Calls are sent with the direct-browser-access header.",
+    fallback: ["claude-sonnet-4-5", "claude-haiku-4-5"]
+  },
+  google: {
+    label: "Google Gemini", style: "gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    needsKey: true, canList: true, maxTemp: 2,
+    keyHint: "Key from aistudio.google.com → Get API key.",
+    fallback: ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+  },
+  openrouter: {
+    label: "OpenRouter", style: "openai", baseUrl: "https://openrouter.ai/api/v1",
+    needsKey: true, canList: true,
+    keyHint: "One key, most models. Model ids look like anthropic/claude-sonnet-4.5.",
+    fallback: []
+  },
+  groq: {
+    label: "Groq", style: "openai", baseUrl: "https://api.groq.com/openai/v1",
+    needsKey: true, canList: true, keyHint: "Key from console.groq.com."
+  },
+  deepseek: {
+    label: "DeepSeek", style: "openai", baseUrl: "https://api.deepseek.com/v1",
+    needsKey: true, canList: true, fallback: ["deepseek-chat", "deepseek-reasoner"]
+  },
+  mistral: {
+    label: "Mistral", style: "openai", baseUrl: "https://api.mistral.ai/v1",
+    needsKey: true, canList: true, fallback: ["mistral-large-latest", "mistral-small-latest"]
+  },
+  xai: {
+    label: "xAI (Grok)", style: "openai", baseUrl: "https://api.x.ai/v1",
+    needsKey: true, canList: true, fallback: ["grok-3", "grok-3-mini"]
+  },
+  together: {
+    label: "Together AI", style: "openai", baseUrl: "https://api.together.xyz/v1",
+    needsKey: true, canList: true
+  },
+  custom: {
+    label: "Custom (OpenAI-compatible)", style: "openai", baseUrl: "http://localhost:8000/v1",
+    needsKey: false, canList: true,
+    note: "Point this at any server that speaks /chat/completions — vLLM, LiteLLM, text-generation-webui, a proxy of your own."
+  }
+};
+
+const DEFAULTS = {
+  provider: "lmstudio",
+  providers: {},          // id -> {baseUrl, apiKey, model}
+  temp: 0.8,
+  maxTok: 9000,
+  flavor: "A parallel internet that feels like the real one: real-seeming companies, forums, wikis, blogs, small personal sites, news outlets. Confident, specific, slightly uncanny. Never break character or mention being generated.",
+  resultsMin: 6,
+  resultsMax: 8,
+  liteMode: false,
+  image: {provider: "offline", perPage: 3, providers: {}},
+  video: {provider: "offline", providers: {}}
+};
+const settings = Object.assign({}, DEFAULTS, JSON.parse(store.getItem("latent.settings") || "{}"));
+if (settings.maxTok === 2000) settings.maxTok = DEFAULTS.maxTok;   // old default was too small for real CSS
+settings.providers = Object.assign({}, settings.providers);
+settings.image = Object.assign({provider:"offline", perPage:3, providers:{}}, settings.image);
+settings.video = Object.assign({provider:"offline", providers:{}}, settings.video);
+// carry over settings written by the LM-Studio-only version of this file
+if (settings.baseUrl && !settings.providers.lmstudio){
+  settings.providers.lmstudio = {baseUrl: settings.baseUrl, model: settings.model || "", apiKey: ""};
+  delete settings.baseUrl; delete settings.model;
+}
+if (!PROVIDERS[settings.provider]) settings.provider = "lmstudio";
+
+function prov(){ return PROVIDERS[settings.provider]; }
+function pcfg(){
+  if (!settings.providers[settings.provider]) settings.providers[settings.provider] = {baseUrl:"", apiKey:"", model:""};
+  return settings.providers[settings.provider];
+}
+function endpoint(){ return (pcfg().baseUrl || prov().baseUrl).replace(/\/+$/, ""); }
+function apiKey(){ return (pcfg().apiKey || "").trim(); }
+function modelId(){ return (pcfg().model || "").trim(); }
+function keyMissing(){ return prov().needsKey && !apiKey(); }
+function clampTemp(t){ return Math.min(t, prov().maxTemp ?? 2); }
+function saveSettings(){ store.setItem("latent.settings", JSON.stringify(settings)); }
+const CACHE_KEY = "latent.cache";
+const CACHE_LIMIT = 60;           // most-recent entries kept in storage
+function loadCache(){
+  try {
+    const raw = store.getItem(CACHE_KEY);
+    if (!raw) return new Map();
+    return new Map(JSON.parse(raw));
+  } catch(e){ return new Map(); }
+}
+const cache = loadCache();        // url -> {kind, payload, title, fav}
+function persistCache(){
+  try {
+    let arr = [...cache.entries()];
+    if (arr.length > CACHE_LIMIT) arr = arr.slice(arr.length - CACHE_LIMIT);
+    store.setItem(CACHE_KEY, JSON.stringify(arr));
+  } catch(e){
+    // likely over the storage quota - drop the oldest half and try once more
+    try {
+      let arr = [...cache.entries()];
+      arr = arr.slice(Math.ceil(arr.length / 2));
+      store.setItem(CACHE_KEY, JSON.stringify(arr));
+    } catch(e2){ /* give up silently, in-memory cache still works this session */ }
+  }
+}
+// wrap the Map's mutators so every change is saved to disk automatically
+const _cacheSet = cache.set.bind(cache), _cacheDelete = cache.delete.bind(cache), _cacheClear = cache.clear.bind(cache);
+cache.set = (k, v) => { const r = _cacheSet(k, v); persistCache(); return r; };
+cache.delete = (k) => { const r = _cacheDelete(k); persistCache(); return r; };
+cache.clear = () => { const r = _cacheClear(); persistCache(); return r; };
+/* Per-domain identity (site name, palette, nav labels, footer, tone) so every
+   page on a domain looks like it belongs to the same site. Persisted like the
+   page cache, but kept in its own store and NEVER shared across domains —
+   generation only ever looks up the identity for the domain being rendered. */
+const DOMAIN_KEY = "latent.domains";
+const DOMAIN_LIMIT = 150;
+function loadDomains(){
+  try {
+    const raw = store.getItem(DOMAIN_KEY);
+    if (!raw) return new Map();
+    return new Map(JSON.parse(raw));
+  } catch(e){ return new Map(); }
+}
+const domains = loadDomains();    // hostname -> {name, palette, nav, footer, tone}
+function persistDomains(){
+  try {
+    let arr = [...domains.entries()];
+    if (arr.length > DOMAIN_LIMIT) arr = arr.slice(arr.length - DOMAIN_LIMIT);
+    store.setItem(DOMAIN_KEY, JSON.stringify(arr));
+  } catch(e){
+    try {
+      let arr = [...domains.entries()];
+      arr = arr.slice(Math.ceil(arr.length / 2));
+      store.setItem(DOMAIN_KEY, JSON.stringify(arr));
+    } catch(e2){ /* give up silently */ }
+  }
+}
+const _domSet = domains.set.bind(domains), _domDelete = domains.delete.bind(domains), _domClear = domains.clear.bind(domains);
+domains.set = (k, v) => { const r = _domSet(k, v); persistDomains(); return r; };
+domains.delete = (k) => { const r = _domDelete(k); persistDomains(); return r; };
+domains.clear = () => { const r = _domClear(); persistDomains(); return r; };
+
+/* Per-domain SITE SHELL: the real header, footer, body wrapper and stylesheet
+   captured from the first complete page on a domain. Every later page on that
+   domain is written as content only and dropped into this shell by the browser,
+   so the chrome is identical by construction rather than by asking the model
+   nicely. Stored on its own (it's much bigger than an identity) and, like
+   identities, looked up only for the domain being rendered. */
+const SHELL_KEY = "latent.shells";
+const SHELL_LIMIT = 40;
+function loadShells(){
+  try {
+    const raw = store.getItem(SHELL_KEY);
+    if (!raw) return new Map();
+    return new Map(JSON.parse(raw));
+  } catch(e){ return new Map(); }
+}
+const shells = loadShells();      // hostname -> {css, skeleton, bodyAttrs, htmlAttrs, slot, links, from, at}
+function persistShells(){
+  try {
+    let arr = [...shells.entries()];
+    if (arr.length > SHELL_LIMIT) arr = arr.slice(arr.length - SHELL_LIMIT);
+    store.setItem(SHELL_KEY, JSON.stringify(arr));
+  } catch(e){
+    try {
+      let arr = [...shells.entries()];
+      arr = arr.slice(Math.ceil(arr.length / 2));
+      store.setItem(SHELL_KEY, JSON.stringify(arr));
+    } catch(e2){ /* give up silently */ }
+  }
+}
+const _shSet = shells.set.bind(shells), _shDelete = shells.delete.bind(shells), _shClear = shells.clear.bind(shells);
+shells.set = (k, v) => { const r = _shSet(k, v); persistShells(); return r; };
+shells.delete = (k) => { const r = _shDelete(k); persistShells(); return r; };
+shells.clear = () => { const r = _shClear(); persistShells(); return r; };
+
+/* What a link or search result "promised" about its destination — the title/
+   snippet text shown with it. In-memory only (not persisted): it's only
+   useful for the generation that's about to happen, and re-derived from the
+   page itself every time that page is freshly rendered. */
+const navContext = new Map(); // url -> {label, snippet, fromUrl, via}
+const NAV_CONTEXT_LIMIT = 400;
+function rememberContext(url, ctx){
+  if (!ctx || (!ctx.label && !ctx.snippet)) return;
+  navContext.delete(url); navContext.set(url, ctx); // refresh insertion order
+  if (navContext.size > NAV_CONTEXT_LIMIT){ navContext.delete(navContext.keys().next().value); }
+}
+
+let connected = false;
+let inflight = null;              // AbortController
+
+/* ---------------- tabs ---------------- */
+let tabs = [];
+let active = 0;
+const uid = () => Math.random().toString(36).slice(2,9);
+
+function newTab(url = HOME, focus = true){
+  tabs.push({ id: uid(), history: [url], idx: 0, title: "New tab", fav: "◍" });
+  if (focus) active = tabs.length - 1;
+  drawTabs(); go(url, {replace:true});
+}
+function closeTab(i){
+  tabs.splice(i,1);
+  if (!tabs.length) return newTab();
+  if (active >= tabs.length) active = tabs.length - 1;
+  drawTabs(); render(current().history[current().idx]);
+}
+const current = () => tabs[active];
+const currentUrl = () => current().history[current().idx];
+
+function drawTabs(){
+  const strip = document.getElementById("tabstrip");
+  strip.innerHTML = "";
+  tabs.forEach((t,i) => {
+    const el = document.createElement("div");
+    el.className = "tab" + (i === active ? " active" : "");
+    el.innerHTML = `<span class="fav"></span><span class="ttl"></span><button class="x" title="Close tab">×</button>`;
+    el.querySelector(".fav").textContent = t.fav;
+    el.querySelector(".ttl").textContent = t.title;
+    el.querySelector(".ttl").title = t.title;
+    el.onclick = () => { if (i !== active){ active = i; drawTabs(); render(currentUrl()); } };
+    el.querySelector(".x").onclick = e => { e.stopPropagation(); closeTab(i); };
+    strip.appendChild(el);
+  });
+  const add = document.createElement("button");
+  add.className = "newtab"; add.textContent = "+"; add.title = "New tab";
+  add.onclick = () => newTab();
+  strip.appendChild(add);
+}
+
+function setTabMeta(title, fav){
+  const t = current();
+  if (title) t.title = title;
+  if (fav) t.fav = fav;
+  document.title = (title || "Latent") + " — Latent";
+  drawTabs();
+}
+
+/* ---------------- url helpers ---------------- */
+function normalize(input){
+  const s = input.trim();
+  if (!s) return HOME;
+  if (s === "home" || s.startsWith("about:")) return HOME;
+  if (/^https?:\/\//i.test(s)) return s;
+  const looksLikeHost = !/\s/.test(s) && /\.[a-z]{2,}(\/|$|\?)/i.test(s);
+  return looksLikeHost ? canon("https://" + s) : searchUrl(s);
+}
+/* Canonicalize a URL the same way the browser's own URL parser does, so
+   "dogs.com" (typed) and "dogs.com/" (linked to from within a page) always
+   collapse to the exact same string — and therefore the same cache entry /
+   same site — instead of being treated as two different websites. */
+function canon(u){
+  try { return new URL(u).href; } catch(e){ return u; }
+}
+const searchUrl = q => ENGINE + "/search?q=" + encodeURIComponent(q);
+const isSearch = u => u.startsWith(ENGINE + "/search");
+const queryOf = u => { try { return decodeURIComponent(new URL(u).searchParams.get("q") || ""); } catch(e){ return ""; } };
+const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./,""); } catch(e){ return u; } };
+function crumbOf(u){
+  try { const x = new URL(u);
+    const parts = x.pathname.split("/").filter(Boolean).slice(0,3);
+    return hostOf(u) + (parts.length ? " › " + parts.join(" › ") : "");
+  } catch(e){ return u; }
+}
+
+/* ---------------- navigation ---------------- */
+/* Only ever navigate to our own virtual pages or real http(s) addresses.
+   A generated page can (accidentally or not) contain a link/action to
+   something like file:///D:/, chrome://, ftp://, etc. — those must never
+   actually be visited, so every navigation funnels through go(), and go()
+   silently drops anything that isn't HOME, a Hallucinet search, or http(s). */
+function isNavigable(url){
+  return url === HOME || isSearch(url) || /^https?:\/\//i.test(url);
+}
+function go(url, opts = {}){
+  if (!isNavigable(url)) return;
+  if (opts.context) rememberContext(url, opts.context);
+  const t = current();
+  if (opts.replace) { t.history[t.idx] = url; }
+  else if (url !== currentUrl()) {
+    t.history = t.history.slice(0, t.idx + 1);
+    t.history.push(url); t.idx = t.history.length - 1;
+  }
+  render(url, opts.force);
+}
+function back(){ const t = current(); if (t.idx > 0){ t.idx--; render(currentUrl()); } }
+function fwd(){ const t = current(); if (t.idx < t.history.length - 1){ t.idx++; render(currentUrl()); } }
+
+function syncChrome(url){
+  document.getElementById("url").value = url === HOME ? "" : url;
+  document.getElementById("lock").textContent = url === HOME ? "◍" : "🔒";
+  document.getElementById("back").disabled = current().idx === 0;
+  document.getElementById("fwd").disabled  = current().idx === current().history.length - 1;
+  updateStar();
+}
+function progress(p){
+  const bar = document.getElementById("progress");
+  bar.classList.toggle("busy", p > 0 && p < 100);
+  bar.firstElementChild.style.width = (p <= 0 || p >= 100 ? 0 : p) + "%";
+  document.getElementById("reload").textContent = (p > 0 && p < 100) ? "✕" : "⟳";
+}
+
+const layer = document.getElementById("layer");
+const frame = document.getElementById("frame");
+const genMoreBtn = document.getElementById("genMoreBtn");
+function showLayer(html){ layer.innerHTML = html; layer.classList.add("show"); layer.scrollTop = 0; }
+function showFrame(){ layer.classList.remove("show"); }
+function setGenMoreVisible(v){ genMoreBtn.classList.toggle("show", !!v); }
+genMoreBtn.onclick = () => extendCurrentPage();
+
+/* ---------------- model client ----------------
+   One complete() for the whole app; the provider decides the wire format.
+------------------------------------------------- */
+function authHeaders(){
+  const k = apiKey(), h = {"Content-Type": "application/json"};
+  switch (prov().style){
+    case "anthropic":
+      if (k) h["x-api-key"] = k;
+      h["anthropic-version"] = "2023-06-01";
+      // without this Anthropic refuses browser origins outright
+      h["anthropic-dangerous-direct-browser-access"] = "true";
+      break;
+    case "gemini":
+      if (k) h["x-goog-api-key"] = k;
+      break;
+    default:
+      if (k) h["Authorization"] = "Bearer " + k;
+      if (settings.provider === "openrouter") h["X-Title"] = "Latent";
+  }
+  return h;
+}
+
+async function listModels(){
+  const base = endpoint(), style = prov().style;
+  if (style === "gemini"){
+    const res = await fetch(base + "/models", {headers: authHeaders()});
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    return (data.models || [])
+      .filter(m => !m.supportedGenerationMethods || m.supportedGenerationMethods.includes("generateContent"))
+      .map(m => String(m.name || "").replace(/^models\//, ""))
+      .filter(Boolean);
+  }
+  // OpenAI and Anthropic both expose GET /models with a data[] of {id}
+  const res = await fetch(base + "/models", {headers: authHeaders()});
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  return (data.data || []).map(m => m.id).filter(Boolean);
+}
+
+/* server-sent-event reader shared by every streaming shape */
+async function readSSE(res, onFrame){
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  while (true){
+    const {done, value} = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, {stream:true});
+    const lines = buf.split("\n");
+    buf = lines.pop();
+    for (const line of lines){
+      const s = line.trim();
+      if (!s.startsWith("data:")) continue;
+      const payload = s.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try { onFrame(JSON.parse(payload)); } catch(e){ /* partial frame */ }
+    }
+  }
+}
+
+async function failure(res, who){
+  let detail = "";
+  try { detail = (await res.text()).slice(0, 240); } catch(e){}
+  who = who || prov().label;
+  if (res.status === 401 || res.status === 403) return new Error(who + " rejected the API key (HTTP " + res.status + "). " + detail);
+  if (res.status === 404) return new Error(who + " has no such endpoint or model (HTTP 404). Check the endpoint and model id. " + detail);
+  if (res.status === 429) return new Error(who + " is rate limiting or out of quota (HTTP 429). " + detail);
+  return new Error(who + " returned HTTP " + res.status + " — " + detail);
+}
+
+async function complete(opts){
+  if (keyMissing()) throw new Error("No API key set for " + prov().label + ". Add one in ⚙.");
+  inflight?.abort();
+  inflight = new AbortController();
+  const signal = inflight.signal;
+  switch (prov().style){
+    case "anthropic": return completeAnthropic(opts, signal);
+    case "gemini":    return completeGemini(opts, signal);
+    default:          return completeOpenAI(opts, signal);
+  }
+}
+
+async function completeOpenAI({system, user, stream, onDelta, temperature, max_tokens}, signal){
+  const body = {
+    model: modelId() || "local-model",
+    messages: [{role:"system", content:system}, {role:"user", content:user}],
+    temperature: clampTemp(temperature ?? settings.temp),
+    max_tokens: max_tokens ?? settings.maxTok,
+    stream: !!stream
+  };
+  const res = await fetch(endpoint() + "/chat/completions", {
+    method:"POST", headers: authHeaders(), body: JSON.stringify(body), signal
+  });
+  if (!res.ok) throw await failure(res);
+  if (!stream){
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || "";
+  }
+  let out = "";
+  await readSSE(res, j => {
+    const d = j.choices?.[0]?.delta?.content;
+    if (d){ out += d; onDelta?.(d, out); }
+  });
+  return out;
+}
+
+async function completeAnthropic({system, user, stream, onDelta, temperature, max_tokens}, signal){
+  const body = {
+    model: modelId() || "claude-sonnet-4-5",
+    system,
+    messages: [{role:"user", content:user}],
+    temperature: clampTemp(temperature ?? settings.temp),
+    max_tokens: max_tokens ?? settings.maxTok,
+    stream: !!stream
+  };
+  const res = await fetch(endpoint() + "/messages", {
+    method:"POST", headers: authHeaders(), body: JSON.stringify(body), signal
+  });
+  if (!res.ok) throw await failure(res);
+  if (!stream){
+    const data = await res.json();
+    return (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+  }
+  let out = "";
+  await readSSE(res, j => {
+    const d = j.type === "content_block_delta" ? (j.delta?.text || "") : "";
+    if (d){ out += d; onDelta?.(d, out); }
+  });
+  return out;
+}
+
+async function completeGemini({system, user, stream, onDelta, temperature, max_tokens}, signal){
+  const model = (modelId() || "gemini-2.0-flash").replace(/^models\//, "");
+  // 2.5 and later reason before answering, and that reasoning is billed against
+  // maxOutputTokens. A long page can burn the whole budget on thinking and come
+  // back with zero text, so: ask for no thinking, and leave headroom in case the
+  // model refuses to switch it off (Pro, for one, always thinks).
+  const thinker = /gemini-(2\.5|3)/.test(model);
+  const want = max_tokens ?? settings.maxTok;
+  const gen = {
+    temperature: clampTemp(temperature ?? settings.temp),
+    maxOutputTokens: thinker ? want + 4096 : want
+  };
+  const build = budget => JSON.stringify({
+    systemInstruction: {parts:[{text: system}]},
+    contents: [{role:"user", parts:[{text: user}]}],
+    generationConfig: budget === null ? gen : Object.assign({thinkingConfig:{thinkingBudget: budget}}, gen)
+  });
+  const url = endpoint() + "/models/" + encodeURIComponent(model) +
+              (stream ? ":streamGenerateContent?alt=sse" : ":generateContent");
+  const send = budget => fetch(url, {method:"POST", headers: authHeaders(), body: build(budget), signal});
+
+  // 0 = off (flash), 128 = the smallest Pro accepts, null = don't ask at all
+  let res = await send(thinker ? 0 : null);
+  if (!res.ok && res.status === 400 && thinker) res = await send(128);
+  if (!res.ok && res.status === 400 && thinker) res = await send(null);
+  if (!res.ok) throw await failure(res);
+
+  const textOf = j => (j.candidates?.[0]?.content?.parts || [])
+    .filter(p => !p.thought)            // never paint the model's scratchpad
+    .map(p => p.text || "").join("");
+
+  let out = "", why = "", blocked = "";
+  if (!stream){
+    const j = await res.json();
+    out = textOf(j);
+    why = j.candidates?.[0]?.finishReason || "";
+    blocked = j.promptFeedback?.blockReason || "";
+  } else {
+    await readSSE(res, j => {
+      const d = textOf(j);
+      const f = j.candidates?.[0]?.finishReason;
+      if (f) why = f;
+      if (j.promptFeedback?.blockReason) blocked = j.promptFeedback.blockReason;
+      if (d){ out += d; onDelta?.(d, out); }
+    });
+  }
+  if (!out.trim()) throw new Error(geminiEmptyReason(model, why, blocked, thinker));
+  return out;
+}
+
+/* Gemini answering with no text is common enough to deserve a real explanation. */
+function geminiEmptyReason(model, why, blocked, thinker){
+  if (blocked) return `Gemini blocked the request (${blocked}). Try a different query or soften the world description in ⚙.`;
+  if (why === "SAFETY" || why === "PROHIBITED_CONTENT" || why === "RECITATION")
+    return `Gemini stopped this page on its own (${why}) and returned nothing. Reload, or try a different address.`;
+  if (why === "MAX_TOKENS")
+    return thinker
+      ? `${model} spent its whole token budget thinking and never wrote the page. Raise Page length in ⚙, or switch to a flash model — they can turn thinking off.`
+      : `${model} hit the token ceiling before writing anything. Raise Page length in ⚙.`;
+  return `${model} returned an empty response${why ? " (" + why + ")" : ""}. Reload to try again, or pick another model in ⚙.`;
+}
+
+/* ---------------- connection status ---------------- */
+function fillModelList(ids){
+  const dl = document.getElementById("modelList");
+  if (!dl) return;
+  dl.innerHTML = "";
+  ids.slice(0, 400).forEach(id => {
+    const o = document.createElement("option"); o.value = id; dl.appendChild(o);
+  });
+}
+function setStatus(state, text){
+  const dot = document.getElementById("dot"), txt = document.getElementById("statusText");
+  dot.className = "dot" + (state ? " " + state : "");
+  txt.textContent = text;
+}
+function shortModel(){
+  const m = modelId();
+  return m ? m.split("/").pop().slice(0, 26) : "";
+}
+
+/* Verifies the current provider is reachable. Returns true/false and, when the
+   endpoint supports it, refreshes the model suggestions. */
+async function checkConnection(){
+  setStatus("", "connecting…");
+  if (keyMissing()){
+    connected = false;
+    setStatus("off", "API key needed");
+    return false;
+  }
+  try {
+    const models = await listModels();
+    connected = true;
+    if (models.length) fillModelList(models);
+    else if (prov().fallback) fillModelList(prov().fallback);
+    // only auto-pick a model when nothing is chosen yet
+    if (!modelId() && models.length){
+      pcfg().model = models[0];
+      const input = document.getElementById("model");
+      if (input && !input.value) input.value = models[0];
+    }
+    setStatus("on", shortModel() || prov().label);
+    return true;
+  } catch(e){
+    // a listing failure isn't fatal for hosted APIs — generation may still work
+    if (prov().needsKey && apiKey()){
+      connected = true;
+      fillModelList(prov().fallback || []);
+      setStatus("on", shortModel() || prov().label);
+      return true;
+    }
+    connected = false;
+    setStatus("off", "no model server");
+    return false;
+  }
+}
+
+/* ---------------- pictures and clips ----------------
+   The text model never writes a real image URL. It writes
+   <img data-gen="what the picture shows"> and, once the page has landed,
+   hydrateMedia() asks whichever image API is configured to draw it.
+   Video is opt-in per clip: clips are slow and expensive, so the page shows a
+   poster with a button and only generates when someone presses it.
+------------------------------------------------------- */
+const IMAGE_PROVIDERS = {
+  offline: {
+    label: "Offline mode (emoji + CSS/SVG)", kind: "offline",
+    note: "No network calls for pictures. The page uses emoji, CSS gradients/shapes, and inline SVG wherever an image would go."
+  },
+  openverse: {
+    label: "Search: Openverse (no key)", kind: "search", style: "openverse",
+    baseUrl: "https://api.openverse.org/v1", needsKey: false,
+    note: "Finds real, openly-licensed photos and matches them to the page — nothing is generated. Free, no signup."
+  },
+  wikimedia: {
+    label: "Search: Wikipedia / Wikimedia Commons (no key)", kind: "search", style: "wikimedia",
+    baseUrl: "https://commons.wikimedia.org/w/api.php", needsKey: false,
+    note: "Commons is the media library behind every Wikipedia photo, so this is Wikipedia's own images. Free, no signup, but results skew toward encyclopedic subjects."
+  },
+  google_cse: {
+    label: "Search: Google Images", kind: "search", style: "google_cse",
+    baseUrl: "https://www.googleapis.com/customsearch/v1", needsKey: true,
+    modelLabel: "Search engine ID (cx)",
+    keyHint: "Needs two things from Google: an API key from console.cloud.google.com (enable \u201cCustom Search API\u201d), and a search engine ID (cx) from programmablesearchengine.google.com — create an engine, turn on \u201cImage search\u201d and \u201cSearch the entire web.\u201d",
+    note: "Google has no public API for its regular Image search — this is the official Custom Search API in image mode, which is the closest legitimate equivalent. Free tier is 100 queries/day."
+  },
+  unsplash: {
+    label: "Search: Unsplash", kind: "search", style: "unsplash",
+    baseUrl: "https://api.unsplash.com", needsKey: true,
+    keyHint: "Access Key from unsplash.com/developers (the free Demo tier works).",
+    note: "High-quality real photography, searched by keyword."
+  },
+  pexels: {
+    label: "Search: Pexels", kind: "search", style: "pexels",
+    baseUrl: "https://api.pexels.com/v1", needsKey: true,
+    keyHint: "Free API key from pexels.com/api.",
+    note: "Real stock photography, searched by keyword."
+  },
+  pollinations: {
+    label: "Generate: Pollinations (no key)", kind: "generate", style: "pollinations",
+    baseUrl: "https://image.pollinations.ai", model: "flux", needsKey: false,
+    note: "AI-drawn, invented to match the caption. Free and needs no signup. Queues can be slow at busy times."
+  },
+  openai: {
+    label: "Generate: OpenAI Images", kind: "generate", style: "openai",
+    baseUrl: "https://api.openai.com/v1", model: "gpt-image-1", needsKey: true,
+    note: "gpt-image-1 needs a verified org; dall-e-3 works on any key."
+  },
+  google: {
+    label: "Generate: Google Imagen / Gemini image", kind: "generate", style: "google",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    model: "imagen-4.0-generate-001", needsKey: true,
+    note: "Use an imagen-* model, or a gemini-*-image model — both are handled."
+  },
+  stability: {
+    label: "Generate: Stability AI", kind: "generate", style: "stability",
+    baseUrl: "https://api.stability.ai/v2beta/stable-image/generate/core",
+    model: "core", needsKey: true
+  },
+  a1111: {
+    label: "Generate: Automatic1111 / Forge (local)", kind: "generate", style: "a1111",
+    baseUrl: "http://localhost:7860", model: "", needsKey: false,
+    note: "Launch it with --api --cors-allow-origins=* so this page can reach it."
+  },
+  fooocus: {
+    label: "Generate: Fooocus (local)", kind: "generate", style: "fooocus",
+    baseUrl: "http://127.0.0.1:8888", model: "", needsKey: false,
+    note: "Needs the Fooocus-API wrapper running alongside Fooocus (github.com/mrhan1993/Fooocus-API) — plain Fooocus has no REST API on its own. Start it with --host 127.0.0.1 --port 8888 (add --cors so this page can reach it), and browse the Fooocus tab in this page's ⚙ settings for the model field if you use one."
+  },
+  compat: {
+    label: "Generate: Custom (OpenAI images API)", kind: "generate", style: "openai",
+    baseUrl: "http://localhost:8000/v1", model: "", needsKey: false,
+    note: "Anything exposing POST /images/generations — LocalAI, Together, DeepInfra, a proxy."
+  }
+};
+
+const VIDEO_PROVIDERS = {
+  offline: {label: "Offline mode (no clips)", kind: "offline", note: "Pages won't be asked to embed any video."},
+  pexels: {
+    label: "Search: Pexels Videos", kind: "search", style: "pexels",
+    baseUrl: "https://api.pexels.com/videos", needsKey: true,
+    keyHint: "Same free key as Pexels photos, from pexels.com/api.",
+    note: "Finds a real stock clip matching the caption — nothing is generated."
+  },
+  wikimedia: {
+    label: "Search: Wikipedia / Wikimedia Commons (no key)", kind: "search", style: "wikimedia",
+    baseUrl: "https://commons.wikimedia.org/w/api.php", needsKey: false,
+    note: "Searches Commons for a real video file. Free, but the library is small, so many captions won't find one."
+  },
+  archive: {
+    label: "Search: Internet Archive (no key)", kind: "search", style: "archive",
+    baseUrl: "https://archive.org", needsKey: false,
+    note: "Searches the Internet Archive's open video library and embeds a real file directly \u2014 no key, no signup, no daily limit. Results lean toward older, public-domain, and historical footage rather than modern topics, so it misses more often than YouTube on recent subjects."
+  },
+  youtube: {
+    label: "Search: YouTube", kind: "search", style: "youtube",
+    baseUrl: "https://www.googleapis.com/youtube/v3", needsKey: true,
+    keyHint: "An API key from console.cloud.google.com with \u201cYouTube Data API v3\u201d enabled. No OAuth needed, just the key.",
+    note: "Finds a real YouTube video on the topic and embeds the actual player \u2014 not a generated or stock clip. The free quota is limited: a search costs 100 of the 10,000 daily units, so roughly 100 searches a day. Some videos disable embedding; those show a \u201cWatch on YouTube\u201d link instead of playing inline."
+  },
+  google: {
+    label: "Generate: Google Veo", kind: "generate", style: "veo",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    model: "veo-3.0-generate-001", needsKey: true,
+    note: "AI-generated. A clip takes a minute or two and is billed per second of video."
+  },
+  replicate: {
+    label: "Generate: Replicate", kind: "generate", style: "replicate", baseUrl: "https://api.replicate.com/v1",
+    model: "", needsKey: true,
+    note: "Model id looks like owner/name. Replicate often blocks browser origins — a small proxy may be needed."
+  },
+  compat: {
+    label: "Generate: Custom endpoint", kind: "generate", style: "compat", baseUrl: "", model: "", needsKey: false,
+    note: "Any POST endpoint taking {prompt} and returning {url} or {b64}."
+  }
+};
+
+ // registries exist now, so a stale saved id can be checked
+if (settings.image.provider === "none") settings.image.provider = "offline";  // pre-search-mode saves
+if (settings.video.provider === "none") settings.video.provider = "offline";
+if (!IMAGE_PROVIDERS[settings.image.provider]) settings.image.provider = "offline";
+if (!VIDEO_PROVIDERS[settings.video.provider]) settings.video.provider = "offline";
+
+const MEDIA_CACHE = new Map();     // prompt/query key -> src, per session
+let mediaAbort = null;             // cancels pending media when you navigate away
+
+function mreg(kind){
+  const table = kind === "image" ? IMAGE_PROVIDERS : VIDEO_PROVIDERS;
+  return table[settings[kind].provider] || table.offline;
+}
+function mcfg(kind){
+  const s = settings[kind];
+  if (!s.providers[s.provider]) s.providers[s.provider] = {apiKey:"", baseUrl:"", model:""};
+  return s.providers[s.provider];
+}
+function mBase(kind){ return (mcfg(kind).baseUrl || mreg(kind).baseUrl || "").replace(/\/+$/, ""); }
+function mKey(kind){ return (mcfg(kind).apiKey || "").trim(); }
+function mModel(kind){ return (mcfg(kind).model || mreg(kind).model || "").trim(); }
+function imagesOn(){ return mreg("image").kind !== "offline" && !(mreg("image").needsKey && !mKey("image")); }
+function videoOn(){ return mreg("video").kind !== "offline" && !(mreg("video").needsKey && !mKey("video")); }
+
+/* pick a size the API will actually accept, from the element's own proportions */
+function sizeFor(el){
+  const w = parseInt(el.getAttribute("width"), 10) || 0;
+  const h = parseInt(el.getAttribute("height"), 10) || 0;
+  const r = w && h ? w / h : 1;
+  if (r > 1.25) return {w:1344, h:768, ar:"16:9", openai:"1536x1024"};
+  if (r < 0.8)  return {w:768, h:1344, ar:"9:16", openai:"1024x1536"};
+  return {w:1024, h:1024, ar:"1:1", openai:"1024x1024"};
+}
+const b64src = (mime, data) => "data:" + (mime || "image/png") + ";base64," + data;
+
+/* Dispatches to a real search-index lookup or an AI generator, per the
+   configured provider's kind. Call sites don't need to know which. */
+async function resolveImage(prompt, size, signal){
+  return mreg("image").kind === "search"
+    ? searchImage(prompt, signal)
+    : generateImage(prompt, size, signal);
+}
+
+/* pick one of several results so the same page doesn't always show the exact
+   same photo for a generic caption, while still being deterministic per prompt */
+function pickResult(list, prompt){
+  if (!list.length) return null;
+  let h = 0; for (const c of prompt) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return list[h % Math.min(list.length, 8)];
+}
+
+/* ---- search fallback chain ----
+   Small no-key libraries (Commons, Internet Archive) rarely match a long phrase.
+   So each search is retried with fewer words, then single words, then a few
+   generic terms: something loosely related, or even unrelated, beats an empty box. */
+const MEDIA_STOP = new Set("a an the of in on at to for and or with from by is are was were this that these those its his her their our your my near over under into onto about as it be".split(" "));
+const IMG_FALLBACKS = ["landscape","city","architecture","nature","street","sky","mountain","building"];
+const VID_FALLBACKS = ["city","nature","ocean","travel","street","landscape","sky","mountain"];
+function hashStr(s){ let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
+function queryLadder(q, fallbacks){
+  const clean = String(q).replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  const words = clean.split(" ").filter(w => w && !MEDIA_STOP.has(w.toLowerCase()));
+  const list = [clean || String(q)];
+  if (words.length > 2) list.push(words.slice(0, 2).join(" "));
+  if (words.length > 1) list.push(words[0], words[words.length - 1]);
+  const h = hashStr(clean);
+  list.push(fallbacks[h % fallbacks.length], fallbacks[(h + 3) % fallbacks.length]);
+  return [...new Set(list.map(s => s.trim()).filter(Boolean))].slice(0, 6);
+}
+async function searchWithFallback(fn, query, fallbacks, signal){
+  let lastErr;
+  for (const q of queryLadder(query, fallbacks)){
+    try { return await fn(q, signal); }
+    catch(e){
+      // only "nothing found" moves on to a simpler query; network/HTTP errors surface as before
+      if (e.name === "AbortError" || !/\bhad no\b/i.test(e.message || "")) throw e;
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
+function searchImage(query, signal){ return searchWithFallback(searchImageOnce, query, IMG_FALLBACKS, signal); }
+function searchVideo(query, signal){ return searchWithFallback(searchVideoOnce, query, VID_FALLBACKS, signal); }
+// a picture that fails to load gets one swap to a generic photo instead of vanishing
+async function imageFallback(el, prompt, signal){
+  if (mreg("image").kind !== "search" || el.dataset.retried){ el.setAttribute("data-state", "failed"); return; }
+  el.dataset.retried = "1";
+  try {
+    const alt = await searchImage(IMG_FALLBACKS[hashStr(prompt) % IMG_FALLBACKS.length], signal);
+    el.addEventListener("error", () => el.setAttribute("data-state", "failed"), {once:true});
+    el.addEventListener("load", () => el.setAttribute("data-state", "done"), {once:true});
+    el.src = alt;
+  } catch(e){ el.setAttribute("data-state", "failed"); }
+}
+
+async function searchImageOnce(query, signal){
+  const style = mreg("image").style, base = mBase("image"), key = mKey("image");
+  switch (style){
+    case "openverse": {
+      const qs = new URLSearchParams({q: query, page_size: "10", mature: "false"});
+      const res = await fetch(base + "/images/?" + qs, {signal});
+      if (!res.ok) throw await failure(res, mreg("image").label);
+      const results = (await res.json()).results || [];
+      const pick = pickResult(results, query);
+      if (!pick) throw new Error("Openverse had no results for \u201c" + query + "\u201d.");
+      return pick.thumbnail || pick.url;   // Openverse-hosted thumbnail loads reliably; source URLs often block hotlinking
+    }
+    case "wikimedia": {
+      const qs = new URLSearchParams({
+        action: "query", generator: "search", gsrnamespace: "6", gsrlimit: "10",
+        gsrsearch: query, prop: "imageinfo", iiprop: "url", iiurlwidth: "1024",
+        format: "json", origin: "*"
+      });
+      const res = await fetch(base + "?" + qs, {signal});
+      if (!res.ok) throw await failure(res, mreg("image").label);
+      const pages = Object.values((await res.json()).query?.pages || {});
+      const shots = pages
+        .map(p => p.imageinfo?.[0])
+        .filter(i => i?.thumburl && /\.(jpe?g|png|webp)($|\?)/i.test(i.thumburl));
+      const pick = pickResult(shots, query);
+      if (!pick) throw new Error("Wikimedia Commons had no photo for \u201c" + query + "\u201d.");
+      return pick.thumburl;
+    }
+    case "unsplash": {
+      const qs = new URLSearchParams({query, per_page: "10", orientation: "landscape"});
+      const res = await fetch(base + "/search/photos?" + qs, {signal, headers:{Authorization:"Client-ID " + key}});
+      if (!res.ok) throw await failure(res, mreg("image").label);
+      const results = (await res.json()).results || [];
+      const pick = pickResult(results, query);
+      if (!pick) throw new Error("Unsplash had no results for \u201c" + query + "\u201d.");
+      return pick.urls?.regular || pick.urls?.small;
+    }
+    case "pexels": {
+      const qs = new URLSearchParams({query, per_page: "10"});
+      const res = await fetch(base + "/search?" + qs, {signal, headers:{Authorization:key}});
+      if (!res.ok) throw await failure(res, mreg("image").label);
+      const results = (await res.json()).photos || [];
+      const pick = pickResult(results, query);
+      if (!pick) throw new Error("Pexels had no results for \u201c" + query + "\u201d.");
+      return pick.src?.large || pick.src?.medium;
+    }
+    case "google_cse": {
+      const cx = (mcfg("image").model || "").trim();
+      if (!cx) throw new Error("Google Images needs a search engine ID (cx) — add one in \u2699.");
+      const qs = new URLSearchParams({key, cx, q: query, searchType: "image", num: "10", safe: "active"});
+      const res = await fetch(base + "?" + qs, {signal});
+      if (!res.ok) throw await failure(res, mreg("image").label);
+      const items = (await res.json()).items || [];
+      const pick = pickResult(items, query);
+      if (!pick) throw new Error("Google Images had no results for \u201c" + query + "\u201d.");
+      return pick.link;
+    }
+    default: throw new Error("No image search provider configured.");
+  }
+}
+
+async function generateImage(prompt, size, signal){
+  const style = mreg("image").style, base = mBase("image"), key = mKey("image"), model = mModel("image");
+  switch (style){
+    case "pollinations": {
+      // returns a plain image URL — the browser fetches it as any <img> would
+      const qs = new URLSearchParams({width:size.w, height:size.h, nologo:"true", model: model || "flux", seed: String(Math.floor(Math.random()*1e6))});
+      return base + "/prompt/" + encodeURIComponent(prompt) + "?" + qs;
+    }
+    case "openai": {
+      const body = {model: model || "gpt-image-1", prompt, n:1, size: size.openai};
+      const res = await fetch(base + "/images/generations", {
+        method:"POST", signal,
+        headers: Object.assign({"Content-Type":"application/json"}, key ? {Authorization:"Bearer " + key} : {}),
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw await failure(res, mreg("image").label);
+      const d = (await res.json()).data?.[0] || {};
+      if (d.b64_json) return b64src("image/png", d.b64_json);
+      if (d.url) return d.url;
+      throw new Error("no image in response");
+    }
+    case "google": {
+      if (/^imagen/i.test(model)){
+        const res = await fetch(base + "/models/" + encodeURIComponent(model) + ":predict", {
+          method:"POST", signal, headers:{"Content-Type":"application/json","x-goog-api-key":key},
+          body: JSON.stringify({instances:[{prompt}], parameters:{sampleCount:1, aspectRatio:size.ar}})
+        });
+        if (!res.ok) throw await failure(res, mreg("image").label);
+        const p = (await res.json()).predictions?.[0];
+        if (!p?.bytesBase64Encoded) throw new Error("Imagen returned no image — the prompt may have been filtered.");
+        return b64src(p.mimeType, p.bytesBase64Encoded);
+      }
+      // gemini-*-image models answer through generateContent with inline bytes
+      const res = await fetch(base + "/models/" + encodeURIComponent(model) + ":generateContent", {
+        method:"POST", signal, headers:{"Content-Type":"application/json","x-goog-api-key":key},
+        body: JSON.stringify({
+          contents:[{role:"user", parts:[{text: prompt}]}],
+          generationConfig:{responseModalities:["IMAGE"]}
+        })
+      });
+      if (!res.ok) throw await failure(res, mreg("image").label);
+      const parts = (await res.json()).candidates?.[0]?.content?.parts || [];
+      const inline = parts.find(p => p.inlineData || p.inline_data);
+      const d = inline?.inlineData || inline?.inline_data;
+      if (!d) throw new Error("Gemini returned no image data.");
+      return b64src(d.mimeType || d.mime_type, d.data);
+    }
+    case "stability": {
+      const fd = new FormData();
+      fd.append("prompt", prompt);
+      fd.append("output_format", "jpeg");
+      fd.append("aspect_ratio", size.ar);
+      const res = await fetch(base, {
+        method:"POST", signal,
+        headers:{Authorization:"Bearer " + key, Accept:"image/*"},
+        body: fd
+      });
+      if (!res.ok) throw await failure(res, mreg("image").label);
+      return URL.createObjectURL(await res.blob());
+    }
+    case "a1111": {
+      const res = await fetch(base + "/sdapi/v1/txt2img", {
+        method:"POST", signal, headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({prompt, steps:20, width:Math.min(size.w,1024), height:Math.min(size.h,1024),
+                              sampler_name:"DPM++ 2M", cfg_scale:6, override_settings: model ? {sd_model_checkpoint: model} : {}})
+      });
+      if (!res.ok) throw await failure(res, mreg("image").label);
+      const img = (await res.json()).images?.[0];
+      if (!img) throw new Error("no image returned");
+      return b64src("image/png", img);
+    }
+    case "fooocus": {
+      const res = await fetch(base + "/v1/generation/text-to-image", {
+        method:"POST", signal, headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          prompt,
+          async_process: false,
+          require_base64: true,
+          image_number: 1,
+          aspect_ratios_selection: size.w + "*" + size.h,
+          base_model_name: model || undefined
+        })
+      });
+      if (!res.ok) throw await failure(res, mreg("image").label);
+      const results = await res.json();
+      const first = Array.isArray(results) ? results[0] : results;
+      if (!first) throw new Error("Fooocus returned no result.");
+      if (first.finish_reason && first.finish_reason !== "SUCCESS") throw new Error("Fooocus job ended: " + first.finish_reason);
+      if (first.base64) return b64src("image/png", first.base64);
+      if (first.url) return first.url;
+      throw new Error("no image in response");
+    }
+    default: throw new Error("No image provider configured.");
+  }
+}
+
+async function searchVideoOnce(query, signal){
+  const style = mreg("video").style, base = mBase("video"), key = mKey("video");
+  switch (style){
+    case "pexels": {
+      const qs = new URLSearchParams({query, per_page: "10"});
+      const res = await fetch(base + "/search?" + qs, {signal, headers:{Authorization:key}});
+      if (!res.ok) throw await failure(res, mreg("video").label);
+      const videos = (await res.json()).videos || [];
+      const pick = pickResult(videos, query);
+      if (!pick) throw new Error("Pexels had no clips for \u201c" + query + "\u201d.");
+      const files = (pick.video_files || []).filter(f => f.file_type === "video/mp4");
+      const best = files.sort((a, b) => (a.width || 0) - (b.width || 0))
+        .find(f => (f.width || 0) >= 640) || files[0];
+      if (!best) throw new Error("Pexels result had no playable file.");
+      return best.link;
+    }
+    case "wikimedia": {
+      const qs = new URLSearchParams({
+        action: "query", generator: "search", gsrnamespace: "6", gsrlimit: "10",
+        gsrsearch: query + " filetype:video", prop: "imageinfo", iiprop: "url",
+        format: "json", origin: "*"
+      });
+      const res = await fetch(base + "?" + qs, {signal});
+      if (!res.ok) throw await failure(res, mreg("video").label);
+      const pages = Object.values((await res.json()).query?.pages || {});
+      const clips = pages
+        .map(p => p.imageinfo?.[0])
+        .filter(i => i?.url && /\.(webm|ogv|mp4)($|\?)/i.test(i.url));
+      const pick = pickResult(clips, query);
+      if (!pick) throw new Error("Wikimedia Commons had no video for \u201c" + query + "\u201d — its library is small, so this misses often.");
+      return pick.url;
+    }
+    case "youtube": {
+      const qs = new URLSearchParams({key, q: query, part: "snippet", type: "video", maxResults: "10", safeSearch: "moderate"});
+      const res = await fetch(base + "/search?" + qs, {signal});
+      if (!res.ok) throw await failure(res, mreg("video").label);
+      const items = (await res.json()).items || [];
+      const pick = pickResult(items, query);
+      if (!pick?.id?.videoId) throw new Error("YouTube had no results for \u201c" + query + "\u201d.");
+      return "https://www.youtube.com/embed/" + pick.id.videoId + "?rel=0";
+    }
+    case "archive": {
+      const sq = new URLSearchParams();
+      sq.set("q", "(" + query + ") AND mediatype:(movies) AND -subject:(adult OR erotica OR xxx)");
+      sq.append("fl[]", "identifier"); sq.append("fl[]", "title");
+      sq.append("sort[]", "downloads desc");            // popular items are far more likely to have a playable file
+      sq.set("rows", "12"); sq.set("page", "1"); sq.set("output", "json");
+      const res = await fetch(base + "/advancedsearch.php?" + sq, {signal});
+      if (!res.ok) throw await failure(res, mreg("video").label);
+      const docs = (await res.json()).response?.docs || [];
+      if (!docs.length) throw new Error("Internet Archive had no results for \u201c" + query + "\u201d.");
+      // many items have no browser-playable file, so try a few before giving up
+      const start = hashStr(query) % Math.min(docs.length, 6), tries = Math.min(docs.length, 5);
+      for (let k = 0; k < tries; k++){
+        const it = docs[(start + k) % docs.length];
+        if (!it?.identifier) continue;
+        try {
+          const mRes = await fetch(base + "/metadata/" + encodeURIComponent(it.identifier), {signal});
+          if (!mRes.ok) continue;
+          const files = (await mRes.json()).files || [];
+          const mp4s = files.filter(f => /\.mp4$/i.test(f.name) && +f.size > 200000).sort((a, b) => +a.size - +b.size);
+          const vid = mp4s[0] || files.find(f => /\.(mp4|ogv|webm)$/i.test(f.name));   // smallest mp4 = the light derivative
+          if (vid) return base + "/download/" + it.identifier + "/" + encodeURIComponent(vid.name);
+        } catch(e){ if (e.name === "AbortError") throw e; }
+      }
+      throw new Error("Internet Archive had no playable video for \u201c" + query + "\u201d.");
+    }
+    default: throw new Error("No video search provider configured.");
+  }
+}
+
+async function resolveVideo(prompt, signal){
+  return mreg("video").kind === "search" ? searchVideo(prompt, signal) : generateVideo(prompt, signal);
+}
+
+async function generateVideo(prompt, signal){
+  const style = mreg("video").style, base = mBase("video"), key = mKey("video"), model = mModel("video");
+  if (style === "veo"){
+    const start = await fetch(base + "/models/" + encodeURIComponent(model) + ":predictLongRunning", {
+      method:"POST", signal, headers:{"Content-Type":"application/json","x-goog-api-key":key},
+      body: JSON.stringify({instances:[{prompt}], parameters:{aspectRatio:"16:9"}})
+    });
+    if (!start.ok) throw await failure(start, mreg("video").label);
+    const op = await start.json();
+    if (!op.name) throw new Error("Veo did not start a job.");
+    // long-running: poll until the sample shows up, up to about four minutes
+    for (let i = 0; i < 40; i++){
+      await new Promise(r => setTimeout(r, 6000));
+      if (signal?.aborted) throw new DOMException("aborted", "AbortError");
+      const pr = await fetch(base + "/" + op.name, {headers:{"x-goog-api-key":key}, signal});
+      if (!pr.ok) throw await failure(pr, mreg("video").label);
+      const st = await pr.json();
+      if (st.error) throw new Error(st.error.message || "Veo failed");
+      if (!st.done) continue;
+      const uri = st.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri
+               || st.response?.generatedSamples?.[0]?.video?.uri;
+      if (!uri) throw new Error("Veo finished without returning a clip.");
+      try {
+        const f = await fetch(uri, {headers:{"x-goog-api-key":key}, signal});
+        if (f.ok) return URL.createObjectURL(await f.blob());
+      } catch(e){ /* fall through to the keyed URL */ }
+      return uri + (uri.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(key);
+    }
+    throw new Error("Veo is still working after four minutes — try again later.");
+  }
+  if (style === "replicate"){
+    const res = await fetch(base + "/models/" + model + "/predictions", {
+      method:"POST", signal,
+      headers:{"Content-Type":"application/json", Authorization:"Bearer " + key, Prefer:"wait=60"},
+      body: JSON.stringify({input:{prompt}})
+    });
+    if (!res.ok) throw await failure(res, mreg("video").label);
+    const j = await res.json();
+    const out = Array.isArray(j.output) ? j.output[0] : j.output;
+    if (!out) throw new Error("Replicate returned no clip (it may still be rendering).");
+    return out;
+  }
+  if (style === "compat"){
+    if (!base) throw new Error("Set the endpoint for your video service in ⚙.");
+    const res = await fetch(base, {
+      method:"POST", signal,
+      headers: Object.assign({"Content-Type":"application/json"}, key ? {Authorization:"Bearer " + key} : {}),
+      body: JSON.stringify({prompt, model})
+    });
+    if (!res.ok) throw await failure(res, mreg("video").label);
+    const j = await res.json();
+    if (j.url) return j.url;
+    if (j.b64) return "data:video/mp4;base64," + j.b64;
+    throw new Error("Endpoint returned neither url nor b64.");
+  }
+  throw new Error("No video provider configured.");
+}
+
+/* ---------------- media hydration ---------------- */
+function injectMediaCss(doc){
+  if (!doc || doc.getElementById("latent-media-css")) return;
+  const s = doc.createElement("style");
+  s.id = "latent-media-css";
+  s.textContent = `
+    img[data-gen]{background:linear-gradient(110deg,#e9e6f4 8%,#dfdbee 18%,#e9e6f4 33%);
+      background-size:220% 100%;animation:latshim 1.3s linear infinite;
+      min-height:90px;border-radius:6px;object-fit:cover;display:block}
+    img[data-gen][data-state="done"]{animation:none;background:none}
+    img[data-gen][data-state="failed"]{animation:none;
+      background:repeating-linear-gradient(45deg,#f2f0f8,#f2f0f8 10px,#ebe8f4 10px,#ebe8f4 20px)}
+    @keyframes latshim{to{background-position:-220% 0}}
+    .latent-clip{position:relative;display:block;max-width:100%;border-radius:8px;overflow:hidden;
+      background:#1b1a24;color:#e9e6f2;font-family:system-ui,sans-serif;min-height:180px}
+    .latent-clip button{position:absolute;inset:0;width:100%;height:100%;border:0;cursor:pointer;
+      background:rgba(20,18,28,.55);color:#fff;font:500 13px/1.5 system-ui,sans-serif;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+    .latent-clip button:hover{background:rgba(20,18,28,.42)}
+    .latent-clip .ply{font-size:26px}
+    .latent-clip .cap{opacity:.75;max-width:80%;text-align:center;font-size:11.5px}
+    @media (prefers-reduced-motion:reduce){img[data-gen]{animation:none}}`;
+  (doc.head || doc.documentElement).appendChild(s);
+}
+
+/* Fills in every <img data-gen> on the page, a couple at a time. */
+async function hydrateMedia(doc, url){
+  if (!doc) return;
+  injectMediaCss(doc);
+  wireClips(doc);
+  if (!imagesOn()) {
+    doc.querySelectorAll("img[data-gen]:not([data-state])").forEach(el => el.remove());
+    return;
+  }
+  mediaAbort?.abort();
+  mediaAbort = new AbortController();
+  const signal = mediaAbort.signal;
+
+  const all = [...doc.querySelectorAll("img[data-gen]:not([data-state])")];
+  const budget = Math.max(0, settings.image.perPage);
+  all.slice(budget).forEach(el => el.remove());      // stay inside the per-page cap
+  const queue = all.slice(0, budget);
+  queue.forEach(el => el.setAttribute("data-state", "pending"));
+
+  const worker = async () => {
+    while (queue.length){
+      if (signal.aborted) return;
+      const el = queue.shift();
+      const prompt = el.getAttribute("data-gen") || el.getAttribute("alt") || "";
+      if (!prompt){ el.remove(); continue; }
+      const size = sizeFor(el);
+      const key = settings.image.provider + "|" + size.ar + "|" + prompt;
+      try {
+        let src = MEDIA_CACHE.get(key);
+        if (!src){
+          src = await resolveImage(prompt.slice(0, 900), size, signal);
+          MEDIA_CACHE.set(key, src);
+        }
+        if (signal.aborted) return;
+        el.addEventListener("error", () => imageFallback(el, prompt, signal), {once:true});
+        el.addEventListener("load", () => el.setAttribute("data-state", "done"), {once:true});
+        el.src = src;
+        if (!el.alt) el.alt = prompt.slice(0, 120);
+      } catch(e){
+        if (e.name === "AbortError") return;
+        el.setAttribute("data-state", "failed");
+        el.title = "Image unavailable: " + e.message;
+      }
+    }
+  };
+  await Promise.all([worker(), worker()]);          // two in flight is plenty
+}
+
+/* Clips stay as a poster until someone actually asks for one. */
+function wireClips(doc){
+  doc.querySelectorAll("video[data-gen]:not([data-state])").forEach(v => {
+    v.setAttribute("data-state", "idle");
+    const prompt = v.getAttribute("data-gen") || "";
+    if (!videoOn() || !prompt){ v.remove(); return; }
+    const box = doc.createElement("div");
+    box.className = "latent-clip";
+    box.style.aspectRatio = (v.getAttribute("width") || 16) + " / " + (v.getAttribute("height") || 9);
+    box.innerHTML = `<button type="button"><span class="ply">▶</span>
+      <span>Play clip</span><span class="cap"></span></button>`;
+    box.querySelector(".cap").textContent = prompt.slice(0, 90);
+    v.replaceWith(box);
+    box.querySelector("button").addEventListener("click", async () => {
+      const btn = box.querySelector("button");
+      btn.disabled = true;
+      btn.querySelector("span:nth-child(2)").textContent =
+        mreg("video").kind === "search" ? "Finding a clip…" : "Rendering… this can take a minute";
+      try {
+        const cacheKey = "v|" + settings.video.provider + "|" + prompt;
+        let src = MEDIA_CACHE.get(cacheKey);
+        if (!src){ src = await resolveVideo(prompt.slice(0, 900)); MEDIA_CACHE.set(cacheKey, src); }
+        const ytId = src.match(/^https:\/\/www\.youtube\.com\/embed\/([^?]+)/);
+        if (ytId){
+          const wrap = doc.createElement("div");
+          wrap.style.position = "relative"; wrap.style.width = "100%";
+          wrap.style.aspectRatio = box.style.aspectRatio;
+          const ifr = doc.createElement("iframe");
+          ifr.src = src + (src.includes("?") ? "&" : "?") + "autoplay=1";
+          ifr.style.width = "100%"; ifr.style.height = "100%"; ifr.style.border = "0"; ifr.style.display = "block";
+          ifr.setAttribute("allow", "autoplay; encrypted-media; picture-in-picture");
+          ifr.setAttribute("allowfullscreen", "true");
+          wrap.appendChild(ifr);
+          // some videos refuse to embed and just show YouTube's own error inside
+          // the frame with no way for this page to detect it, so a direct link
+          // out is the reliable fallback
+          const link = doc.createElement("a");
+          link.href = "https://www.youtube.com/watch?v=" + ytId[1];
+          link.target = "_blank"; link.rel = "noopener";
+          link.textContent = "Open on YouTube \u2197";
+          link.style.cssText = "position:absolute;right:6px;bottom:6px;font:11px system-ui,sans-serif;" +
+            "background:rgba(0,0,0,.6);color:#fff;padding:3px 7px;border-radius:5px;text-decoration:none";
+          wrap.appendChild(link);
+          box.replaceWith(wrap);
+          return;
+        }
+        const vid = doc.createElement("video");
+        vid.src = src; vid.controls = true; vid.autoplay = true; vid.loop = true; vid.muted = true;
+        vid.playsInline = true; vid.style.width = "100%"; vid.style.display = "block";
+        box.replaceWith(vid);
+      } catch(e){
+        btn.disabled = false;
+        btn.querySelector("span:nth-child(2)").textContent = "Couldn't render — tap to retry";
+        box.querySelector(".cap").textContent = e.message.slice(0, 120);
+      }
+    });
+  });
+}
+
+
+/* ---------------- router ---------------- */
+function render(url, force){
+  inflight?.abort(); inflight = null;
+  mediaAbort?.abort(); mediaAbort = null;
+  syncChrome(url);
+  progress(0);
+  if (url === HOME){ setGenMoreVisible(false); return renderHome(); }
+  if (isSearch(url)){ setGenMoreVisible(false); return renderSearch(url, force); }
+  return renderPage(url, force);
+}
+
+/* ---------------- home ---------------- */
+const WORDMARK = `<span class="mark"><i class="c1">H</i><i class="c2">a</i><i class="c3">l</i><i class="c4">l</i><i class="c5">u</i><i class="c6">c</i><i class="c1">i</i><i class="c2">n</i><i class="c3">e</i><i class="c4">t</i></span>`;
+
+function renderHome(){
+  setTabMeta("New tab", "◍");
+  showLayer(`
+    <div class="home">
+      ${WORDMARK}
+      <div class="tagline">Every page you open is written the moment you ask for it.</div>
+      <div class="searchbar">
+        <span class="ic">⌕</span>
+        <input id="homeq" placeholder="Search an internet that has never existed" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="home-btns">
+        <button class="btn primary" id="doSearch">Search Hallucinet</button>
+        <button class="btn" id="lucky">Take me somewhere strange</button>
+      </div>
+      ${connected ? `<p class="note">Try <b>obscure 1990s shareware</b>, <b>the town where nobody sleeps</b>, or type an address like <b>moonlight-transit.co/timetables</b> straight into the bar above.</p>`
+        : `<div class="offline">${keyMissing()
+             ? `<b>${escapeHtml(prov().label)} needs an API key.</b><br>
+                Open ⚙, paste your key, pick a model, and save.`
+             : `<b>Nothing answering at <code>${escapeHtml(endpoint())}</code>.</b><br>
+                ${escapeHtml(prov().note || "Check the endpoint in ⚙ and press Test connection.")}`}
+           </div>`}
+    </div>`);
+  showFrame_off();
+  const q = document.getElementById("homeq");
+  const fire = () => { const v = q.value.trim(); if (v) go(searchUrl(v)); };
+  q.addEventListener("keydown", e => { if (e.key === "Enter") fire(); });
+  document.getElementById("doSearch").onclick = fire;
+  document.getElementById("lucky").onclick = () => go(searchUrl(pick(LUCKY)));
+  setTimeout(() => { if (!scrim.classList.contains("show")) q.focus(); }, 30);
+  progress(0);
+}
+function showFrame_off(){ /* layer already on top */ }
+
+const LUCKY = ["a museum that only exhibits weather","forum for retired lighthouse keepers",
+  "the last working pneumatic tube network","recipes from a country that isn't there",
+  "field guide to imaginary migratory birds","software for talking to houses"];
+const pick = a => a[Math.floor(Math.random()*a.length)];
+
+/* ---------------- search results ---------------- */
+const SEARCH_SYS = `You are the index of a search engine for a fictional internet. World: {{FLAVOR}}
+
+Return ONLY a JSON object, no prose, no markdown fences:
+{
+ "stats": "About 4,120,000 results (0.31 seconds)",
+ "answer": "one or two sentence direct answer, or empty string",
+ "results": [{"title":"...","url":"https://domain.tld/path","snippet":"1-2 sentences, specific, with plausible dates/names/numbers","emoji":"single emoji"}],
+ "panel": {"title":"...","subtitle":"...","facts":["Label: value", "..."]},
+ "related": ["query", "query", "query", "query"]
+}
+{{RESULTS_LINE}} Vary the domains and the kinds of site: encyclopedias, forums, shops, news, personal blogs, PDFs, university pages, abandoned fan sites. Where a real result would obviously live on a well-known real site — a job listing (indeed.com), an encyclopedia entry (wikipedia.org), a home listing (zillow.com), a video (youtube.com), a forum thread (reddit.com), a professional profile (linkedin.com), a social post (instagram.com/facebook.com), a chat community (discord.com) — use that real domain for that one result instead of inventing one. Never mention being an AI or that this is fictional.`;
+
+function resultBounds(){
+  const lo = Math.max(1, Math.min(settings.resultsMin, settings.resultsMax));
+  const hi = Math.max(1, Math.max(settings.resultsMin, settings.resultsMax));
+  return [lo, hi];
+}
+function resultsLine(){
+  const [lo, hi] = resultBounds();
+  return lo === hi
+    ? `Give exactly ${lo} result${lo === 1 ? "" : "s"}.`
+    : `Give between ${lo} and ${hi} results — vary the count from search to search within that range.`;
+}
+function searchSystemPrompt(){
+  let sys = SEARCH_SYS.replace("{{FLAVOR}}", settings.flavor).replace("{{RESULTS_LINE}}", resultsLine());
+  if (settings.liteMode){
+    sys += `\n\nLITE MODE — this model is small, so keep output minimal: snippets are one short sentence, "panel" is null, "related" has at most 2 items, no extra keys, no commentary.`;
+  }
+  return sys;
+}
+function searchMaxTokens(){
+  const [, hi] = resultBounds();
+  if (settings.liteMode) return Math.max(350, Math.min(settings.maxTok, 180 + hi * 70));
+  return Math.max(1200, Math.min(settings.maxTok, 2600));
+}
+
+async function renderSearch(url, force){
+  const q = queryOf(url);
+  setTabMeta(q + " — Hallucinet", "⌕");
+  const cached = !force && cache.get(url);
+  if (cached) return paintSearch(q, cached.payload);
+
+  paintSearch(q, null);              // skeleton
+  progress(18);
+  try {
+    const raw = await complete({
+      system: searchSystemPrompt(),
+      user: "Search query: " + q,
+      stream: true,
+      max_tokens: searchMaxTokens(),
+      onDelta: (_d, all) => progress(Math.min(90, 18 + all.length / 14))
+    });
+    const data = parseJson(raw);
+    if (!data || !Array.isArray(data.results)) throw new Error("The index came back unreadable. Try again, or lower Imagination in settings.");
+    cache.set(url, {kind:"search", payload:data});
+    progress(100); setTimeout(() => progress(0), 300);
+    paintSearch(q, data);
+  } catch(e){
+    if (e.name === "AbortError") return;
+    progress(0);
+    paintSearch(q, null, e.message);
+  }
+}
+
+function paintSearch(q, data, error){
+  const head = `
+    <div class="results-head">
+      <div class="rh-row">
+        <span id="homeMark">${WORDMARK}</span>
+        <div class="searchbar"><span class="ic">⌕</span>
+          <input id="rq" spellcheck="false" autocomplete="off" value="${escapeHtml(q)}"></div>
+      </div>
+      <div class="rh-tabs"><span class="sel">All</span><span>Images</span><span>News</span><span>Archive</span><span>Maps</span></div>
+    </div>`;
+
+  let body;
+  if (error){
+    body = `<div class="errbox"><h3>This search didn't come back</h3>${escapeHtml(error)}</div>`;
+  } else if (!data){
+    body = `<div class="results-wrap"><div class="results">
+      <div class="stat">Consulting the index…</div>
+      ${Array.from({length:5}).map(() => `
+        <div class="result">
+          <div class="skel" style="width:38%"></div>
+          <div class="skel" style="width:62%;height:19px"></div>
+          <div class="skel" style="width:96%"></div>
+          <div class="skel" style="width:81%"></div>
+        </div>`).join("")}
+    </div></div>`;
+  } else {
+    const results = data.results.map(r => `
+      <div class="result">
+        <div class="crumb"><span class="fav">${escapeHtml(r.emoji || "◍")}</span>${escapeHtml(crumbOf(r.url || ""))}</div>
+        <h3><a data-url="${escapeHtml(r.url || "")}" data-label="${escapeHtml(r.title || "")}" data-snippet="${escapeHtml(r.snippet || "")}">${escapeHtml(r.title || "Untitled")}</a></h3>
+        <p>${escapeHtml(r.snippet || "")}</p>
+      </div>`).join("");
+    const panel = data.panel && data.panel.title ? `
+      <aside class="panel">
+        <h4>${escapeHtml(data.panel.title)}</h4>
+        <div class="sub">${escapeHtml(data.panel.subtitle || "")}</div>
+        <ul>${(data.panel.facts || []).map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
+      </aside>` : "";
+    const answer = data.answer ? `<div class="answer"><h4>Quick answer</h4><p>${escapeHtml(data.answer)}</p></div>` : "";
+    const related = (data.related || []).length ? `
+      <div class="related"><h4>People also searched for</h4><div>
+        ${data.related.map(r => `<button data-q="${escapeHtml(r)}">${escapeHtml(r)}</button>`).join("")}
+      </div></div>` : "";
+    body = `<div class="results-wrap">
+        <div class="results"><div class="stat">${escapeHtml(data.stats || "")}</div>${answer}${results}${related}</div>
+        ${panel}
+      </div>`;
+  }
+
+  showLayer(head + body);
+
+  const rq = document.getElementById("rq");
+  rq.addEventListener("keydown", e => { if (e.key === "Enter" && rq.value.trim()) go(searchUrl(rq.value.trim())); });
+  document.getElementById("homeMark").onclick = () => go(HOME);
+  layer.querySelectorAll("[data-url]").forEach(a => a.onclick = () => go(a.dataset.url, {
+    context: {label: a.dataset.label || "", snippet: a.dataset.snippet || "", fromUrl: searchUrl(q), via: "search result"}
+  }));
+  layer.querySelectorAll("[data-q]").forEach(b => b.onclick = () => go(searchUrl(b.dataset.q)));
+}
+
+/* ---------------- generated pages ---------------- */
+const PAGE_SYS = `You are the web server for a fictional internet. World: {{FLAVOR}}
+
+You are given a URL and must respond with the complete HTML document that lives at it.
+
+Rules:
+- Output raw HTML only, starting with <!DOCTYPE html>. No markdown fences, no commentary.
+- Inline <style> in the head. No external files, no CDNs, no network <img src> of your own.\n{{MEDIA}}
+- DESIGN COMES FIRST. Open <style> with a two-line CSS comment stating this site's design plan: (1) palette as named hexes plus its mood, (2) type pairing and layout concept in one sentence. Then write the CSS with the most care, then the content. The result must look like a real, professionally designed, current site with its own point of view for THIS subject: never a default-browser page and never a generic template. Unless the URL clearly implies an old or hobbyist site, use contemporary (2024+) design.
+- Tokens: right after that comment declare :root variables with exactly these names and build all color, radius and shadow from them: --bg, --surface, --text, --muted, --accent, --on-accent, --border, --radius, --shadow, --font, --font-head. Choose the palette from the subject's world (materials, industry, era, audience), not a default: avoid cream + terracotta, near-black + acid green, and purple-blue gradient washes unless the subject truly calls for them. Use a tinted neutral instead of pure #fff or #000.
+- Type carries the personality. Webfonts will not load, so use stacks: sans "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; serif "Iowan Old Style","Palatino Linotype",Georgia,serif; mono ui-monospace,"SF Mono",Menlo,Consolas,monospace. Pick a heading/body pairing on purpose. Set a real scale: clamp() headings, tight letter-spacing at large sizes, body 16-18px at line-height 1.6 (a bit more for serif), lines under about 70ch.
+- Layout with CSS grid/flexbox in a max-width container (about 1100-1240px). Vary the structure: not every section is a row of identical cards; mix a wide feature, an asymmetric split, a dense list, a full-bleed band. Sections get 64-112px of vertical padding; use a sticky header with a border or backdrop-filter blur. If the page type has a hero, open with the most characteristic thing in this subject's world (a headline, a product mock built from CSS, an SVG illustration, a live-looking widget), not a row of stats.
+- Depth and finish: a considered hierarchy of radius and elevation (not one radius and one grey shadow on everything), 1px borders, pill badges, avatars, dividers. Give links, buttons and inputs real :hover and :focus-visible states. Keep motion rare: at most one entrance moment, and transitions only where they answer a hover or click.
+- Follow the genre's real conventions: SaaS (hero, proof, feature layout, pricing, closing CTA), news (masthead, lead story with a rail, dense grid), store (product grid with price, rating, badges), docs (sidebar nav, content column, code blocks), forum/social (compact threaded posts, avatars, votes, timestamps), portfolio/blog (generous whitespace, large type).
+- Avoid these tells: ALL-CAPS eyebrow labels over every heading, numbered 01/02/03 markers on non-sequences, one accented word in a headline, arrows appended to every link, emoji as icons, unstyled lists or buttons, default blue links, tables for layout, walls of text without hierarchy.
+- Responsive: fluid grids via repeat(auto-fit,minmax(min(100%,260px),1fr)) and one @media (max-width:760px) rule that stacks columns and simplifies the nav. Add a prefers-color-scheme:dark token override when it suits the brand.
+- A zero-specificity base kit is preloaded (box-sizing reset, .container, .row, .grid, .stack, .btn, .card, .badge; they read the tokens above). Use it for boilerplate, but it is only a floor: write this site's own distinctive layout and components on top of it.
+- Output format reminder: your first characters are <!DOCTYPE html> and your last are </html> (then the SITE line when required). Never wrap the output in a markdown code fence.
+- Content should still match the kind of site the URL implies: a forum has posts and timestamps, a shop has prices, a bank sounds corporate.
+- Fill it with specific invented content: names, dates, prices, version numbers, quotes, comment threads. No lorem ipsum, no placeholder text.
+- Include 5-9 <a href="..."> links to other pages, some on this domain, some on other invented domains. Links must be plausible full or absolute-path URLs.
+- When a link would naturally point to a real, well-known site rather than an invented one, use the real domain instead, to make browsing feel grounded in a real internet:
+  jobs/careers/hiring → indeed.com · forums/discussion threads/"see what people are saying" → reddit.com · photo-sharing/"follow us"/lifestyle social → instagram.com · general "share"/"sign in with"/friends-and-family social → facebook.com · video embeds or "watch" links → youtube.com · professional profiles/"connect with us at work" → linkedin.com · homes, apartments, real estate listings → zillow.com · encyclopedia/background reading/"learn more" → wikipedia.org · chat servers/community invites → discord.com.
+  Only do this where it's genuinely the kind of link that real site would carry; don't force it in, and never let it replace this domain's own internal navigation.
+- Include the site's own navigation and footer so it feels like part of a larger site.
+- Structure the document so the site's shared parts can be reused on its other pages: put all site-wide CSS in the head <style>, wrap the site name and navigation in one <header> at the top, put this page's own content inside a single <main>, and put the site footer in one <footer> at the bottom. Never put page-specific content in the header or footer.
+- Never mention AI, models, generation, or that this is fictional. Stay in character completely.
+- If you're told what the visitor was promised by the link or search result they clicked, the page you write MUST deliver on that — same subject, same implied content. Never bait-and-switch to something unrelated.
+
+Comment sections and post feeds — if (and only if) this page is the kind of page that would plausibly let visitors post something (an article with comments, a forum thread, a social feed, a guestbook, a review section), make it interactive by marking it exactly like this:
+- Wrap the box visitors type into in <form data-latent-postbox>, containing one <textarea data-latent-postbox-input> (or <input data-latent-postbox-input> for a short reply box) and a submit button.
+- Wrap the list that existing and new comments/posts live in with data-latent-comment-list on that container.
+- Wrap EVERY existing comment/post item in an element carrying data-latent-comment-item, with the author's name in a child carrying data-latent-comment-author and the message body in a child carrying data-latent-comment-body, so a new one can be built to match.
+- Do not add these markers to pages that shouldn't have a comment box (a homepage, a product page, a static article with no comments) — only where it's genuine to the page.
+
+Site identity — a domain is ONE site, so every page on it must look and feel like it belongs together, and must NEVER borrow another domain's name, palette, nav, or voice:
+- If the prompt gives you this domain's existing identity, reuse it exactly as given: same site name, same header/nav labels and structure, same footer, same color palette and visual style, same tone of voice. Only the page's own content changes — never redescribe or redesign the site itself.
+- If no identity is given, you're inventing this domain's very first page — invent a coherent one, then, after your closing </html>, on its own line, output exactly one line in this form (it is metadata, not part of the page, and is stripped before anyone sees it):
+  <!--SITE:{"name":"short site name","palette":["#hex","#hex","#hex","#hex"],"nav":["label","label","label"],"footer":"short footer line","tone":"a few words on voice and style","design":"a few words: type pairing, radius, layout concept"}-->
+  Only ever include this line when you are inventing a brand-new domain, never when reusing a given identity.`;
+
+/* What the text model is told about pictures depends on what's configured. */
+function mediaRules(forFragment){
+  const lines = [];
+  // no-key libraries are small: ask for the broadest word so something always turns up
+  const imgNoKey = !mreg("image").needsKey, vidNoKey = !mreg("video").needsKey;
+  const imgEx = imgNoKey ? "one or two common words, e.g. 'lighthouse'" : "a short real-world search phrase for the subject, e.g. 'lighthouse Maine coast fog'";
+  const imgWhy = imgNoKey ? "so use ONE or TWO plain, common words only: the broadest noun for the subject (e.g. 'lighthouse', 'city night', 'bread'). No adjectives, brand or place names, dates or full phrases. This library is small: a specific phrase finds nothing, a general word always finds something." : "so keep it a plain keyword phrase (2-6 words) rather than a scene description, since an overly specific or invented phrase won't match anything.";
+  const vidEx = vidNoKey ? "one or two common words, e.g. 'ocean'" : "a short real-world search phrase for the footage, e.g. 'city traffic night timelapse'";
+  const vidWhy = vidNoKey ? "so use ONE or TWO plain, common words only (e.g. 'ocean', 'city traffic'): the broadest noun for the footage. The archive is small: a specific phrase finds nothing, a general word always finds something." : "so keep it a plain keyword phrase, not an invented scene.";
+  const ik = imagesOn() ? mreg("image").kind : "offline";
+  if (ik === "generate"){
+    const n = Math.max(1, settings.image.perPage);
+    lines.push(`- Where a real site would show a photo or graphic, write an image tag with NO src: <img data-gen="a concrete description of the picture — subject, setting, era, lighting, medium" alt="short caption" width="640" height="400">. The data-gen text is the only thing that decides what gets drawn, so make it specific and visual, never abstract. Use at most ${n} of these${forFragment ? " in this fragment" : " on the page"}, only where a picture genuinely belongs.`);
+  } else if (ik === "search"){
+    const n = Math.max(1, settings.image.perPage);
+    lines.push(`- Where a real site would show a photo, write an image tag with NO src: <img data-gen="${imgEx}" alt="short caption" width="640" height="400">. This text is sent to a real photo search engine, not a generator — a real, existing photo of roughly that subject gets embedded, ${imgWhy} Use at most ${n} of these${forFragment ? " in this fragment" : " on the page"}, only where a real photo genuinely fits the invented content around it.`);
+  } else {
+    lines.push(`- Where a picture belongs, never use emoji as icons or images. Use inline <svg> (simple 24px stroke icons in currentColor, or abstract geometric illustrations) or a div with a layered CSS gradient background in the site palette, inside a fixed aspect-ratio box (aspect-ratio:16/9 with a radius). Vary the gradients so no two placeholders look alike.`);
+  }
+  const vk = videoOn() ? mreg("video").kind : "offline";
+  if (vk === "generate"){
+    lines.push(`- If the site would embed a clip, you may include one <video data-gen="description of the moving shot" width="640" height="360"></video>. At most one${forFragment ? " per fragment" : " per page"}, and only where it fits.`);
+  } else if (vk === "search"){
+    const yt = mreg("video").style === "youtube";
+    lines.push(yt
+      ? `- If the site would embed a clip, you may include one <video data-gen="a natural YouTube search query for a real video on this topic, e.g. 'how volcanoes form explained' or 'vintage lighthouse Maine documentary'" width="640" height="360"></video>. This is sent to YouTube's own search and the actual matching video gets embedded, so phrase it the way someone would type it into YouTube. At most one${forFragment ? " per fragment" : " per page"}, and only where a real video genuinely fits.`
+      : `- If the site would embed a clip, you may include one <video data-gen="${vidEx}" width="640" height="360"></video>. This is sent to a real stock-video search, ${vidWhy} At most one${forFragment ? " per fragment" : " per page"}, and only where it fits.`);
+  }
+  return lines.join("\n");
+}
+
+function pageSystemPrompt(){
+  let sys = PAGE_SYS.replace("{{FLAVOR}}", settings.flavor).replace("{{MEDIA}}", mediaRules(false));
+  if (settings.liteMode){
+    sys += `\n\nLITE MODE — this model is small, so keep it short: compact but polished CSS (:root variables, flex/grid layout, one accent color, clear type hierarchy, hover and focus states; skip animations), 3-5 links instead of 6-12, brief content (a few short paragraphs or list items). Still complete, valid HTML with a real <title>.`;
+  }
+  return sys;
+}
+function pageMaxTokens(){
+  return settings.liteMode ? Math.max(400, Math.min(settings.maxTok, 900)) : settings.maxTok;
+}
+
+/* What a link or search result "promised" about its destination, phrased for
+   the model — empty string when there's nothing to say. */
+function contextBlock(url){
+  const ctx = navContext.get(url);
+  if (!ctx || !(ctx.label || ctx.snippet)) return "";
+  const said = [ctx.label, ctx.snippet].filter(Boolean).join(" — ");
+  return `The visitor arrived by clicking a ${ctx.via || "link"}${ctx.fromUrl ? " on " + hostOf(ctx.fromUrl) : ""} that said:\n"${said}"\nThe page must deliver on that.`;
+}
+
+/* Builds the per-request "user" message for a domain's FIRST page (or any page
+   on a domain with no saved shell): the URL, this domain's established
+   identity (if any — looked up ONLY for this domain, never another one), and
+   whatever the clicked link or search result promised about the page. */
+function pageUserPrompt(url, identity){
+  const parts = [`URL: ${url}`];
+  if (identity){
+    parts.push(`This domain's identity is already established. Reuse it exactly — do not redesign the site and do not output a SITE comment:\n${JSON.stringify(identity)}`);
+  }
+  const ctx = contextBlock(url);
+  if (ctx) parts.push(ctx);
+  parts.push("Write the document served at this URL.");
+  return parts.join("\n\n");
+}
+
+/* ---------------- site shells ----------------
+   Once a domain has one complete page, its header/footer/CSS are lifted out of
+   that page and stored. Later pages on the domain only ask the model for the
+   content between header and footer, and the browser wraps it in the stored
+   shell — so dogs.com/anything always has dogs.com's exact chrome. */
+const SLOT = "<!--LATENT_SLOT-->";                 // marks the content hole inside a stored skeleton
+const SLOT_OPEN = "<!--LATENT_CONTENT-->";         // written around content in shell pages,
+const SLOT_CLOSE = "<!--/LATENT_CONTENT-->";       // so "Generate more" can add inside the content area
+
+const CHROME_RE = /\b(header|head|nav|navbar|masthead|topbar|footer|foot)\b/i;
+function looksLikeChrome(n){
+  if (n.nodeType === 3) return !n.textContent.trim();
+  if (n.nodeType === 8) return true;
+  if (n.nodeType !== 1) return false;
+  if (/^(HEADER|NAV|FOOTER|STYLE|SCRIPT|LINK|TEMPLATE)$/.test(n.tagName)) return true;
+  return CHROME_RE.test((n.id || "") + " " + (n.getAttribute("class") || ""));
+}
+
+/* Decide which part of a finished page is "the page's own content". Prefers a
+   real <main>, then common content wrappers, then whatever sits between the
+   leading header/nav blocks and the trailing footer blocks. */
+function findSlot(body){
+  const chrome = [...body.querySelectorAll("header, footer, nav")]
+    .filter(el => !el.closest("main, article, [role='main']"));
+  const clean = el => !chrome.some(c => c === el || c.contains(el) || el.contains(c));
+  for (const sel of ["main", "[role='main']", "#main", "#content", "#main-content", ".main-content", "#primary", ".content", "article"]){
+    const c = [...body.querySelectorAll(sel)].filter(clean);
+    if (sel === "article" && c.length !== 1) continue;       // several articles = a list, not the page
+    if (c.length) return {kind: "el", el: c.sort((x, y) => y.textContent.length - x.textContent.length)[0]};
+  }
+  let parent = body;
+  while (parent.children.length === 1 && /^(DIV|SECTION)$/.test(parent.firstElementChild.tagName)) parent = parent.firstElementChild;
+  const kids = [...parent.childNodes];
+  let lo = 0, hi = kids.length;
+  while (lo < hi && looksLikeChrome(kids[lo])) lo++;
+  while (hi > lo && looksLikeChrome(kids[hi - 1])) hi--;
+  const mid = kids.slice(lo, hi);
+  if (!mid.some(n => n.nodeType === 1)) return null;
+  return {kind: "range", parent, mid};
+}
+
+function openTag(el){
+  const t = el.cloneNode(false).outerHTML;
+  return t.slice(0, t.indexOf(">") + 1);
+}
+function attrString(el){
+  return [...el.attributes].filter(a => !/^on/i.test(a.name))
+    .map(a => ` ${a.name}="${escapeHtml(a.value)}"`).join("");
+}
+
+/* Turns a freshly generated, COMPLETE page into a reusable shell, or returns
+   null if it can't find sensible chrome (the identity system still applies). */
+function buildShell(html, url){
+  if (!/<\/html>/i.test(html)) return null;        // cut off mid-page: don't freeze half a site
+  let doc;
+  try { doc = new DOMParser().parseFromString(html, "text/html"); } catch(e){ return null; }
+  const body = doc.body;
+  if (!body) return null;
+
+  body.querySelectorAll("script, noscript").forEach(n => n.remove());
+  const css = [...doc.querySelectorAll("head style")].map(st => st.textContent).join("\n").trim();
+
+  const slot = findSlot(body);
+  if (!slot) return null;
+  const marker = doc.createComment("LATENT_SLOT");
+  let wrap;
+  if (slot.kind === "el"){
+    wrap = openTag(slot.el);
+    while (slot.el.firstChild) slot.el.removeChild(slot.el.firstChild);
+    slot.el.appendChild(marker);
+  } else {
+    wrap = slot.parent === body ? "<body>" : openTag(slot.parent);
+    slot.mid[0].before(marker);
+    slot.mid.forEach(n => n.remove());
+  }
+
+  // strip anything that would make one page's chrome look "current" or run code
+  body.querySelectorAll("*").forEach(el => {
+    [...el.attributes].forEach(at => { if (/^on/i.test(at.name)) el.removeAttribute(at.name); });
+    el.removeAttribute("aria-current");
+    const cl = el.getAttribute("class");
+    if (cl){
+      const kept = cl.split(/\s+/).filter(t => t && !/^(active|current|selected|is-active|current-page|current-menu-item)$/i.test(t));
+      if (kept.length) el.setAttribute("class", kept.join(" ")); else el.removeAttribute("class");
+    }
+  });
+
+  // links in the chrome must mean the same thing from every page, so make them absolute
+  const links = [], seen = new Set();
+  body.querySelectorAll("a[href]").forEach(a => {
+    const h = (a.getAttribute("href") || "").trim();
+    if (!h || h.startsWith("#") || /^(javascript:|mailto:|tel:)/i.test(h)) return;
+    const abs = resolve(h, url);
+    a.setAttribute("href", abs);
+    if (!seen.has(abs) && links.length < 24){
+      seen.add(abs);
+      links.push({t: (a.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40) || hostOf(abs), h: abs});
+    }
+  });
+  body.querySelectorAll("form[action]").forEach(f => f.setAttribute("action", resolve(f.getAttribute("action"), url)));
+
+  const skeleton = body.innerHTML;
+  if (!skeleton.includes(SLOT)) return null;
+  if (!links.length && body.textContent.trim().length < 15) return null;   // nothing worth reusing
+  if (css.length > 40000 || skeleton.length > 30000) return null;          // would swamp storage
+
+  return {v: 1, from: url, at: Date.now(), htmlAttrs: attrString(doc.documentElement),
+          bodyAttrs: attrString(body), css, skeleton, slot: wrap, links};
+}
+
+function shellHead(shell, title){
+  return "<!DOCTYPE html><html" + shell.htmlAttrs + '><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1"><title>' + escapeHtml(title) +
+    "</title><style>" + shell.css + "</style></head><body" + shell.bodyAttrs + ">";
+}
+function shellSplit(shell){
+  const i = shell.skeleton.indexOf(SLOT);
+  return [strip(shell.skeleton.slice(0, i)), strip(shell.skeleton.slice(i + SLOT.length))];   // also heals any saved shell that picked up a fence
+}
+
+const SHELL_SYS = `You are the web server for a fictional internet. World: {{FLAVOR}}
+
+You are given a URL on a site that already exists. The site's header, navigation, footer and stylesheet are stored and will be wrapped around your output automatically. You write ONLY the page-specific content that goes between the header and the footer.
+
+Output format, exactly:
+<title>Page title as it would appear in a browser tab</title>
+...the page content HTML...
+
+Rules:
+- Output raw HTML only. No markdown fences, no commentary.
+- Do NOT write <!DOCTYPE>, <html>, <head>, <body>, or any site header, masthead, top navigation, logo bar or footer. They are added for you. Never repeat them, not even in part.
+- Style the content with the site's existing CSS classes and :root variables (listed below) so it matches the rest of the site; a zero-specificity base kit (.container, .row, .grid, .stack, .btn, .card, .badge) is also preloaded. This page may need its own layout and components (a page-specific hero, split, grid, table or widget): write that CSS freely and with the same care as the rest of the site, in one <style> at the start of the content, with every selector scoped under a wrapper class you invent so nothing in the shared header or footer changes, and every color, radius and shadow drawn from the site's variables. Give the page real visual structure, not just a heading and paragraphs.
+- No external files, no CDNs, no network <img src> of your own.\n{{MEDIA}}
+- Fill it with specific invented content: names, dates, prices, version numbers, quotes, comment threads. No lorem ipsum, no placeholder text. What the content is should follow from the URL (an article, a product listing, a forum thread, a profile...) while staying in this site's voice.
+- Include 4-10 <a href="..."> links inside the content: to other pages on this domain (use paths consistent with the site's existing links) and a few to other invented domains.
+- When a link would naturally point to a real, well-known site rather than an invented one, use the real domain instead: jobs/hiring → indeed.com · forums/discussion → reddit.com · photo-sharing/lifestyle social → instagram.com · general social/"sign in with" → facebook.com · video embeds → youtube.com · professional profiles → linkedin.com · real estate listings → zillow.com · encyclopedia/background reading → wikipedia.org · chat servers/community invites → discord.com. Only where it genuinely fits; don't force it in.
+- Never mention AI, models, generation, or that this is fictional. Stay in character completely.
+- If you're told what the visitor was promised by the link or search result they clicked, the page you write MUST deliver on that — same subject, same implied content. Never bait-and-switch to something unrelated.
+
+Comment sections and post feeds — if (and only if) this page is the kind of page that would plausibly let visitors post something (an article with comments, a forum thread, a social feed, a guestbook, a review section), make it interactive by marking it exactly like this:
+- Wrap the box visitors type into in <form data-latent-postbox>, containing one <textarea data-latent-postbox-input> (or <input data-latent-postbox-input> for a short reply box) and a submit button.
+- Wrap the list that existing and new comments/posts live in with data-latent-comment-list on that container.
+- Wrap EVERY existing comment/post item in an element carrying data-latent-comment-item, with the author's name in a child carrying data-latent-comment-author and the message body in a child carrying data-latent-comment-body, so a new one can be built to match.
+- Do not add these markers to pages that shouldn't have a comment box (a homepage, a product page, a static article with no comments) — only where it's genuine to the page.`;
+
+function shellSystemPrompt(){
+  let sys = SHELL_SYS.replace("{{FLAVOR}}", () => settings.flavor).replace("{{MEDIA}}", () => mediaRules(false));
+  if (settings.liteMode){
+    sys += `\n\nLITE MODE — this model is small, so keep it short: 3-5 links, a few short paragraphs or list items, no extra <style> unless essential.`;
+  }
+  return sys;
+}
+
+function shellCssForPrompt(shell){
+  const cap = settings.liteMode ? 3000 : 12000;
+  let css = shell.css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ").trim();
+  if (css.length > cap){
+    css = css.slice(0, cap);
+    const i = css.lastIndexOf("}");
+    if (i > 0) css = css.slice(0, i + 1);
+  }
+  return css;
+}
+
+function shellUserPrompt(url, identity, shell){
+  const parts = [`URL: ${url}`];
+  if (identity) parts.push(`This site's identity (name, voice, sections):\n${JSON.stringify(identity)}`);
+  if (shell.links && shell.links.length){
+    parts.push("Links already in the shared header and footer. They are on the page already; link to these sections and to deeper pages that fit them:\n" +
+      shell.links.map(l => `${l.t} → ${l.h}`).join("\n"));
+  }
+  parts.push(`Your content is inserted inside ${shell.slot || "<main>"}, between the site header and the site footer.`);
+  parts.push("The site's stylesheet, already applied to the page. Reuse these classes:\n" + shellCssForPrompt(shell));
+  const ctx = contextBlock(url);
+  if (ctx) parts.push(ctx);
+  parts.push("Write the <title> line and the page content for this URL.");
+  return parts.join("\n\n");
+}
+
+/* Pulls the trailing SITE identity comment (see PAGE_SYS) out of freshly
+   generated HTML and stores it the first time a domain is seen. */
+const SITE_RE = new RegExp("<" + "!--\\s*SITE:\\s*(\\{[\\s\\S]*?\\})\\s*--" + ">", "i");
+
+function captureSiteIdentity(html, host){
+  const m = html.match(SITE_RE);
+  if (!m) return html;
+  if (!domains.has(host)){
+    try { domains.set(host, JSON.parse(m[1])); } catch(e){ /* malformed, just strip it */ }
+  }
+  return (html.slice(0, m.index) + html.slice(m.index + m[0].length))
+    .replace(/```+\s*$/, "")
+    .replace(/\s+$/, "");
+}
+
+const APPEND_SYS = `You are the web server for a fictional internet. World: {{FLAVOR}}
+
+You already served a page at a URL, and the visitor just clicked "Generate more" — like a "load more" or infinite-scroll button — to see additional content added to the bottom of that same page.
+
+Rules:
+- Output ONLY a raw HTML fragment to be inserted right before the page's closing </body> tag. No <!DOCTYPE>, <html>, <head>, or <body> tags, no markdown fences, no commentary.
+- Continue naturally: more of whatever the page already is (more comments, more listings, more entries, another section, more paragraphs) — never repeat or restate content that's already there.
+- Match the existing page's tone, structure, and styling. Reuse its existing class names where they fit; only add a small inline <style> if you introduce new classes, scoped so nothing already on the page breaks.
+- Fill it with new, specific invented content: names, dates, prices, version numbers, quotes. No lorem ipsum, no placeholder text.
+- Include a few new <a href="..."> links where natural, consistent with the rest of the site's linking style. Where one would naturally point to a real well-known site, use the real domain (jobs → indeed.com, forums → reddit.com, photo/lifestyle social → instagram.com, general social → facebook.com, video → youtube.com, professional profiles → linkedin.com, real estate → zillow.com, encyclopedia → wikipedia.org, chat servers → discord.com) only where it genuinely fits.\n{{MEDIA}}
+- If the existing content has comment/post items marked with data-latent-comment-item (each with a data-latent-comment-author and data-latent-comment-body child), any new comments/posts you add must be marked the exact same way so they stay interactive.
+- Never mention AI, models, generation, or that this is fictional.`;
+
+function appendSystemPrompt(inSlot){
+  let sys = APPEND_SYS.replace("{{FLAVOR}}", settings.flavor).replace("{{MEDIA}}", mediaRules(true));
+  if (inSlot){
+    // the page has a shared header/footer; new content belongs above the footer
+    sys = sys.split("inserted right before the page's closing </body> tag").join("added at the end of the page's main content area, above the site footer")
+             .split("No <!DOCTYPE>, <html>, <head>, or <body> tags").join("No <!DOCTYPE>, <html>, <head>, or <body> tags and no site header, navigation or footer");
+  }
+  if (settings.liteMode){
+    sys += `\n\nLITE MODE — this model is small, so keep the addition brief: one short new section, minimal styling.`;
+  }
+  return sys;
+}
+function appendMaxTokens(){
+  return settings.liteMode ? Math.max(250, Math.min(settings.maxTok, 500)) : Math.max(500, Math.min(settings.maxTok, 1400));
+}
+function insertBeforeBodyClose(html, fragment){
+  const idx = html.toLowerCase().lastIndexOf("</body>");
+  if (idx === -1) return html + "\n" + fragment;
+  return html.slice(0, idx) + fragment + "\n" + html.slice(idx);
+}
+function insertAtSlotEnd(html, fragment){
+  const idx = html.lastIndexOf(SLOT_CLOSE);
+  if (idx === -1) return insertBeforeBodyClose(html, fragment);
+  return html.slice(0, idx) + fragment + "\n" + html.slice(idx);
+}
+function findComment(doc, text){
+  const w = doc.createTreeWalker(doc.body, 128);       // 128 = NodeFilter.SHOW_COMMENT
+  let n;
+  while ((n = w.nextNode())) if (n.nodeValue === text) return n;
+  return null;
+}
+
+async function extendCurrentPage(){
+  const url = currentUrl();
+  if (url === HOME || isSearch(url)) return;
+  const entry = cache.get(url);
+  if (!entry || entry.kind !== "page") return;
+
+  const btn = genMoreBtn, icon = document.getElementById("genMoreIcon"), label = document.getElementById("genMoreLabel");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const iconWas = icon.innerHTML, labelWas = label.textContent;
+  icon.innerHTML = '<span class="spin"></span>'; label.textContent = "Writing more…";
+  progress(15);
+
+  // pages built inside a saved shell mark their content area, so new material
+  // lands above the shared footer and the model only has to read the content
+  const openAt = entry.payload.indexOf(SLOT_OPEN), closeAt = entry.payload.lastIndexOf(SLOT_CLOSE);
+  const inSlot = openAt !== -1 && closeAt > openAt;
+  const pageHtml = inSlot ? entry.payload.slice(openAt + SLOT_OPEN.length, closeAt) : entry.payload;
+
+  try {
+    const identity = domains.get(hostOf(url));
+    const idLine = identity ? `Site identity (keep matching it): ${JSON.stringify(identity)}\n\n` : "";
+    const raw = await complete({
+      system: appendSystemPrompt(inSlot),
+      user: inSlot
+        ? `URL: ${url}\n\n${idLine}Current main content of the page (the site header and footer are added around it separately):\n${pageHtml}\n\nWrite only the new fragment to add at the end of this content.`
+        : `URL: ${url}\n\n${idLine}Current page HTML:\n${pageHtml}\n\nWrite only the new fragment to insert before </body>.`,
+      stream: true,
+      max_tokens: appendMaxTokens(),
+      onDelta: (_d, all) => progress(Math.min(90, 15 + all.length / (appendMaxTokens() * 0.045)))
+    });
+    const fragment = strip(raw).trim();
+    if (!fragment) throw new Error("empty");
+
+    // Inject straight into the live document so scroll position and any
+    // in-page state survive — no full reload of the iframe.
+    const liveDoc = frame.contentDocument;
+    if (liveDoc && liveDoc.body){
+      const wrap = liveDoc.createElement("div");
+      wrap.innerHTML = fragment;
+      sanitizeDom(wrap);
+      const mark = inSlot ? findComment(liveDoc, "/LATENT_CONTENT") : null;
+      if (mark && mark.parentNode){
+        while (wrap.firstChild) mark.parentNode.insertBefore(wrap.firstChild, mark);
+      } else {
+        while (wrap.firstChild) liveDoc.body.appendChild(wrap.firstChild);
+      }
+      hydrateMedia(liveDoc, url);
+    }
+    cache.set(url, {...entry, payload: inSlot ? insertAtSlotEnd(entry.payload, fragment) : insertBeforeBodyClose(entry.payload, fragment)});
+    progress(100); setTimeout(() => progress(0), 300);
+  } catch(e){
+    progress(0);
+    if (e.name !== "AbortError"){
+      label.textContent = "Couldn't add more — try again";
+      setTimeout(() => { label.textContent = labelWas; }, 2200);
+      icon.innerHTML = iconWas;
+      btn.disabled = false;
+      return;
+    }
+  }
+  icon.innerHTML = iconWas; label.textContent = labelWas;
+  btn.disabled = false;
+}
+
+async function renderPage(url, force){
+  showFrame();
+  setGenMoreVisible(false);
+  const doc = openFrameDoc();
+  const cached = !force && cache.get(url);
+  if (cached){
+    writeDoc(doc, cached.payload, true);
+    setTabMeta(cached.title || hostOf(url), "◉");
+    wireFrame(url);
+    setGenMoreVisible(true);
+    hydrateMedia(doc, url);
+    return;
+  }
+
+  const host = hostOf(url);
+  // a user-supplied local template for this domain (see Settings → Data) becomes
+  // its shell exactly like a freshly generated page's chrome would — but for free
+  if (!shells.has(host) && domainTemplates.has(host)){
+    const built = buildShell(sanitizeHtmlString(domainTemplates.get(host)), url);
+    if (built) shells.set(host, built);
+  }
+  const identity = domains.get(host);   // looked up for THIS domain only — never shared across domains
+  const shell = shells.get(host);       // ditto: this domain's saved header, footer and stylesheet
+  setTabMeta(host + " — loading", "◌");
+  doc.write(loadingShell(url, !!(identity || shell)));
+  progress(10);
+
+  let started = false, html = "";
+  let mode = shell ? "shell" : "full";  // shell: model writes content only; full: model writes the whole page
+  const [pre, post] = shell ? shellSplit(shell) : ["", ""];
+  let shellTitle = "", written = 0;
+
+  // whole-document streaming: the first page a domain ever gets
+  let fullWritten = 0;
+  const streamFull = (chunk, all) => {
+    const i = all.indexOf("<");                     // anything before the first tag (a code fence, chatter) is dropped
+    if (i === -1 || all.length - i < 14) return;
+    // strip the WHOLE text each time so a fence split across chunks can't leak,
+    // and hold back a fence that may still be arriving at the tail
+    const s = strip(all.slice(i)).replace(/`{1,3}(?:h(?:t(?:m(?:l)?)?)?)?$/i, "");
+    if (!started){ started = true; frameDoc = openFrameDoc(); }
+    if (s.length > fullWritten){ frameDoc.write(s.slice(fullWritten)); fullWritten = s.length; }
+  };
+
+  // content-only streaming: the saved header and stylesheet appear at once,
+  // the model's content streams in after them, the saved footer closes the page
+  const shellText = all => {
+    let t = strip(all).replace(/^\s+/, "");
+    let title = "";
+    if (/^<title/i.test(t)){
+      const end = t.search(/<\/title>/i);
+      if (end === -1) return null;                 // title still arriving
+      title = t.slice(t.indexOf(">") + 1, end).replace(/<[^>]*>/g, "").trim();
+      t = t.slice(end + 8).replace(/^\s+/, "");
+    }
+    return {title, text: t, hadTitle: !!title || /^<title/i.test(strip(all).replace(/^\s+/, ""))};
+  };
+  const openShell = title => {
+    started = true; shellTitle = title;
+    const fresh = openFrameDoc();
+    fresh.write(shellHead(shell, title || host) + pre + SLOT_OPEN);
+    frameDoc = fresh; written = 0;
+  };
+  const pushShell = (r, final) => {
+    const safe = final ? r.text : r.text.replace(/`{1,2}$/, "");   // don't write half a code fence
+    if (safe.length > written){ frameDoc.write(safe.slice(written)); written = safe.length; }
+  };
+
+  try {
+    await complete({
+      system: shell ? shellSystemPrompt() : pageSystemPrompt(),
+      user: shell ? shellUserPrompt(url, identity, shell) : pageUserPrompt(url, identity),
+      stream: true,
+      max_tokens: pageMaxTokens(),
+      onDelta: (_d, all) => {
+        html = cleanModelHtml(all);
+        progress(Math.min(92, 10 + all.length / (pageMaxTokens() * 0.045)));
+        if (mode === "shell"){
+          if (!started){
+            const t0 = strip(all).replace(/^\s+/, "");
+            if (/^(<!doctype|<html)/i.test(t0)){ mode = "full"; return streamFull(_d, all); }   // model ignored the format
+            const r = shellText(all);
+            if (!r || (!r.hadTitle && r.text.length < 12)) return;                                // still deciding
+            openShell(r.title);
+          }
+          const r2 = shellText(all);
+          if (r2) pushShell(r2, false);
+          return;
+        }
+        streamFull(_d, all);
+      }
+    });
+
+    if (mode === "shell"){
+      const t0 = strip(html).replace(/^\s+/, "");
+      const r = shellText(html) || {title: "", text: t0.replace(/^<title[^>]*>/i, "")};
+      if (!started){
+        if (!r.text.trim()) throw new Error("The server sent nothing back.");
+        openShell(r.title);
+      }
+      pushShell(r, true);
+      frameDoc.write(SLOT_CLOSE + post + "</body></html>");
+      frameDoc.close();
+      const title = shellTitle || host;
+      cache.set(url, {kind: "page", payload: shellHead(shell, title) + pre + SLOT_OPEN + r.text + SLOT_CLOSE + post + "</body></html>", title});
+      setTabMeta(title, "◉");
+      decorate(frameDoc);
+      wireFrame(url);
+      setGenMoreVisible(true);
+      progress(100); setTimeout(() => progress(0), 300);
+      hydrateMedia(frameDoc, url);
+      return;
+    }
+
+    if (!started){
+      const sample = html.trim().slice(0, 160);
+      throw new Error(sample
+        ? `${modelId() || prov().label} replied with text instead of an HTML document: “${sample}${html.length > 160 ? "…" : ""}”. Try a stronger model, or turn Lite mode off in ⚙.`
+        : "The server sent nothing back.");
+    }
+    frameDoc.close();
+    const title = frameDoc.title || hostOf(url);
+    const cleanHtml = captureSiteIdentity(html, host);
+    // first complete page on a domain: keep its header, footer and CSS for every later page
+    if (!shells.has(host)){
+      const built = buildShell(cleanHtml, url);
+      if (built) shells.set(host, built);
+    }
+    cache.set(url, {kind:"page", payload:cleanHtml, title});
+    setTabMeta(title, "◉");
+    decorate(frameDoc);
+    wireFrame(url);
+    setGenMoreVisible(true);
+    progress(100); setTimeout(() => progress(0), 300);
+    hydrateMedia(frameDoc, url);
+  } catch(e){
+    if (e.name === "AbortError"){ progress(0); return; }
+    progress(0);
+    const d = openFrameDoc();
+    d.write(errorShell(url, e.message)); d.close();
+    setTabMeta("Can't reach " + hostOf(url), "⚠");
+  }
+}
+
+let frameDoc = null;
+function openFrameDoc(){
+  const d = frame.contentDocument || frame.contentWindow.document;
+  d.open(); frameDoc = d; return d;
+}
+function writeDoc(doc, html, close){
+  doc.write(strip(close ? sanitizeHtmlString(html) : html));
+  if (close){ doc.close(); decorate(doc); }
+}
+const strip = s => s.replace(/```+(?:html)?/gi, "");
+// model output with code fences and any chatter before the first tag removed
+const cleanModelHtml = s => { s = strip(s); const i = s.indexOf("<"); return i > 0 ? s.slice(i) : s; };
+
+const BASE_KIT = `
+:where(*,*::before,*::after){box-sizing:border-box}
+:where(html){-webkit-text-size-adjust:100%}
+:where(body){margin:0;line-height:1.6;font-family:var(--font,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);color:var(--text);background:var(--bg)}
+:where(img,video){max-width:100%;height:auto}
+:where(h1,h2,h3,h4){font-family:var(--font-head,inherit);line-height:1.15;letter-spacing:-.02em;text-wrap:balance}
+:where(p,li){text-wrap:pretty}
+:where(button,input,select,textarea){font:inherit}
+:where(a,button,input,select,textarea,summary):focus-visible{outline:2px solid var(--accent,currentColor);outline-offset:2px}
+:where(.container){width:min(1200px,100% - 2.5rem);margin-inline:auto}
+:where(.row){display:flex;flex-wrap:wrap;align-items:center;gap:var(--gap,1rem)}
+:where(.grid){display:grid;gap:var(--gap,1.5rem);grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+:where(.stack)>:where(*+*){margin-top:var(--gap,1rem)}
+:where(.btn){display:inline-flex;align-items:center;gap:.5rem;padding:.7em 1.2em;border:1px solid transparent;border-radius:var(--radius,8px);background:var(--accent,#333);color:var(--on-accent,#fff);font-weight:600;text-decoration:none;cursor:pointer}
+:where(.card){padding:1.25rem;border:1px solid var(--border,rgba(0,0,0,.1));border-radius:var(--radius,8px);background:var(--surface,transparent)}
+:where(.badge){display:inline-block;padding:.15em .65em;border-radius:99px;font-size:.78em;font-weight:600;background:color-mix(in srgb,var(--accent,#333) 12%,transparent);color:var(--accent,inherit)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+`;
+function decorate(doc){
+  try {
+    const kit = doc.createElement("style");
+    kit.id = "latent-kit"; kit.textContent = BASE_KIT;
+    const hd = doc.head || doc.documentElement;
+    hd.insertBefore(kit, hd.firstChild);
+  } catch(e){}
+  try {
+    const s = doc.createElement("style");
+    s.textContent = `html{-webkit-font-smoothing:antialiased} a{cursor:pointer} img{max-width:100%}
+      ::selection{background:#d9d1ff}`;
+    (doc.head || doc.documentElement).appendChild(s);
+  } catch(e){}
+  sanitizeDom(doc);
+}
+
+/* ---------------- link safety ----------------
+   A generated page is just text the model wrote — it can (by accident or by a
+   prompt-injected instruction somewhere upstream) contain a link to something
+   real and dangerous: file:///D:/, chrome://, an extension page, etc. go()
+   already refuses to navigate the app's own address bar to anything but
+   HOME/search/http(s), but that only covers clicks caught by wireFrame's
+   listener. A middle-click, a right-click "open in new tab", drag-and-drop, or
+   a script setting location.href all act on the raw attribute directly and
+   would bypass that. So every generated document also gets its dangerous
+   attributes neutralized at the DOM level, right after it's written, so the
+   dangerous URL is never actually sitting in an href/src for the browser's
+   own built-in handling to act on. */
+const LATENT_SAFE_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
+const LATENT_LINK_ATTRS = ["href", "src", "action", "formaction", "poster", "cite"];
+function isSafeUrlValue(v){
+  if (v == null) return true;
+  const s = String(v).trim();
+  if (!s) return true;
+  if (s[0] === "#" || s[0] === "?" || s[0] === "/" || s.startsWith("./") || s.startsWith("../")) return true;
+  if (/^data:image\//i.test(s)) return true;               // inline images are fine
+  const m = s.match(/^([a-zA-Z][a-zA-Z0-9+.\-]*):/);
+  if (!m) return true;                                       // no scheme => relative path, harmless
+  return LATENT_SAFE_SCHEMES.has(m[1].toLowerCase());
+}
+function sanitizeDom(doc){
+  if (!doc) return;
+  try {
+    LATENT_LINK_ATTRS.forEach(attr => {
+      doc.querySelectorAll("[" + attr + "]").forEach(el => {
+        if (!isSafeUrlValue(el.getAttribute(attr))){
+          el.removeAttribute(attr);
+          if (attr === "href") el.setAttribute("href", "#");
+          el.setAttribute("data-latent-blocked", "1");
+        }
+      });
+    });
+    doc.querySelectorAll('meta[http-equiv]').forEach(m => {
+      if ((m.getAttribute("http-equiv") || "").toLowerCase() !== "refresh") return;
+      const c = m.getAttribute("content") || "";
+      const mm = c.match(/url\s*=\s*(.+)$/i);
+      if (mm && !isSafeUrlValue(mm[1].trim().replace(/^['"]|['"]$/g, ""))) m.remove();
+    });
+  } catch(e){}
+}
+function sanitizeHtmlString(html){
+  try {
+    const d = new DOMParser().parseFromString(strip(html), "text/html");
+    sanitizeDom(d);
+    return "<!DOCTYPE html>" + d.documentElement.outerHTML;
+  } catch(e){ return html; }
+}
+
+function wireFrame(url){
+  const doc = frame.contentDocument;
+  if (!doc) return;
+  doc.addEventListener("click", e => {
+    const a = e.target.closest?.("a");
+    if (!a) return;
+    e.preventDefault();
+    const href = a.getAttribute("href") || "";
+    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+    if (href.startsWith("mailto:") || href.startsWith("tel:")) return;
+    const dest = resolve(href, url);
+    const label = (a.textContent || "").trim().replace(/\s+/g, " ").slice(0, 140);
+    const snippet = nearbyText(a);
+    go(dest, (label || snippet) ? {context: {label, snippet, fromUrl: url, via: "link"}} : {});
+  }, true);
+  doc.addEventListener("submit", e => {
+    e.preventDefault();
+    const f = e.target;
+    if (f.matches("[data-latent-postbox]") || f.closest("[data-latent-postbox]")){
+      handleCommentSubmit(f.matches("[data-latent-postbox]") ? f : f.closest("[data-latent-postbox]"), url);
+      return;
+    }
+    const fields = [...f.querySelectorAll("input, textarea, select")];
+    const text = fields.find(i => (i.type === "text" || i.type === "search" || i.tagName === "TEXTAREA") && i.value.trim());
+    const action = f.getAttribute("action") || "";
+    if (text){
+      const base = action ? resolve(action, url) : url;
+      const sep = base.includes("?") ? "&" : "?";
+      go(base + sep + "q=" + encodeURIComponent(text.value.trim()));
+    } else if (action){
+      go(resolve(action, url));
+    }
+  }, true);
+  doc.addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.tagName === "INPUT" && !e.target.form){
+      const v = e.target.value.trim();
+      if (v) go(url.split("?")[0] + "?q=" + encodeURIComponent(v));
+    }
+  }, true);
+}
+/* A generated page will sometimes write a link to its own (or another) domain
+   as a bare hostname with no scheme, e.g. href="dogs.com/" or href="dogs.com".
+   Resolved the normal relative way against a page on dogs.com, that turns into
+   dogs.com/dogs.com/ — a second, nested "site". Detect that shape up front and
+   treat it as an absolute address instead, the same way the address bar does. */
+function looksLikeBareDomain(href){
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return false;      // already has a scheme
+  if (!href || /^[\/#?]/.test(href) || /\s/.test(href)) return false;
+  const first = href.split(/[\/?#]/)[0];
+  if (!first.includes(".")) return false;
+  if (/\.(html?|php|aspx?|jsp|css|js|mjs|json|xml|png|jpe?g|gif|svg|ico|webp|avif|pdf|zip|rar|mp3|mp4|webm|woff2?|ttf|eot|txt|csv)$/i.test(first)) return false;
+  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+\.[a-z]{2,}$/i.test(first);
+}
+function resolve(href, base){
+  if (looksLikeBareDomain(href)) return canon("https://" + href);
+  try { return new URL(href, base).href; }
+  catch(e){ return canon("https://" + href.replace(/^\/+/,"")); }
+}
+
+/* ---------------- interactive comments / posts ----------------
+   Pages that plausibly have a comment section are asked (see the SITE
+   prompts) to mark their comment box and comment items with data-latent-*
+   attributes. When the visitor posts one, it's dropped into the page
+   immediately, and the model is asked for one short in-character reply,
+   which is appended right after it — like a real forum or comments thread. */
+function buildCommentNode(doc, template, data){
+  let node;
+  if (template){
+    node = template.cloneNode(true);
+    node.removeAttribute("id");
+    node.querySelectorAll("[data-latent-postbox], form").forEach(n => n.remove());
+    const authorEl = node.querySelector("[data-latent-comment-author]");
+    const bodyEl = node.querySelector("[data-latent-comment-body]");
+    if (authorEl) authorEl.textContent = data.author;
+    if (bodyEl) bodyEl.textContent = data.body;
+    if (!authorEl && !bodyEl) node.textContent = data.author + ": " + data.body;
+  } else {
+    node = doc.createElement("div");
+    node.setAttribute("data-latent-comment-item", "");
+    node.style.cssText = "margin:10px 0;padding:8px 0;border-top:1px solid rgba(0,0,0,.08);font:13px/1.5 inherit";
+    const b = doc.createElement("b");
+    b.setAttribute("data-latent-comment-author", "");
+    b.textContent = data.author + ": ";
+    const body = doc.createElement("span");
+    body.setAttribute("data-latent-comment-body", "");
+    body.textContent = data.body;
+    node.append(b, body);
+  }
+  node.setAttribute("data-latent-comment-item", "");
+  node.style.opacity = data.pending ? "0.6" : "";
+  return node;
+}
+function commentReplySystemPrompt(){
+  return `You are the web server for a fictional internet. World: ${settings.flavor}
+A visitor just posted a comment/reply on a page of this fictional site. Write ONE short, natural reply to it, as another persona who would plausibly be there (another commenter, the original poster, a moderator, a friend — whoever fits the site and the comment).
+Output EXACTLY one line, nothing else — no markdown, no quotes marks around it, no commentary — in this form:
+Name: the reply text
+Keep it brief (1-3 sentences), specific to what the visitor wrote, in the site's voice. Never mention AI, models, or that this is fictional.`;
+}
+function parseCommentReply(raw){
+  const m = raw.trim().match(/^\s*([^:\n]{1,40}):\s*([\s\S]+)$/);
+  if (m) return {author: m[1].trim(), body: m[2].trim()};
+  return {author: "Anonymous", body: raw.trim() || "…"};
+}
+async function handleCommentSubmit(form, url){
+  const doc = form.ownerDocument;
+  const inputEl = form.querySelector("[data-latent-postbox-input]") ||
+                   form.querySelector("textarea, input[type=text], input:not([type])");
+  if (!inputEl) return;
+  const text = (inputEl.value || "").trim();
+  if (!text) return;
+  const list = doc.querySelector("[data-latent-comment-list]") ||
+               form.closest("section, div")?.querySelector("[data-latent-comment-item]")?.parentElement;
+  if (!list) return;   // page didn't mark a place to put it — nothing safe to do
+  const template = list.querySelector("[data-latent-comment-item]");
+
+  const mine = buildCommentNode(doc, template, {author: "You", body: text});
+  list.appendChild(mine);
+  inputEl.value = "";
+  mine.scrollIntoView({block: "nearest", behavior: "smooth"});
+
+  const pending = buildCommentNode(doc, template, {author: "…", body: "writing a reply…", pending: true});
+  list.appendChild(pending);
+
+  try {
+    const raw = await complete({
+      system: commentReplySystemPrompt(),
+      user: `Page: ${url}\n\nVisitor's comment: "${text}"\n\nWrite the reply line now.`,
+      max_tokens: 220
+    });
+    const parsed = parseCommentReply(strip(raw));
+    const replyNode = buildCommentNode(doc, template, parsed);
+    list.replaceChild(replyNode, pending);
+  } catch(e){
+    pending.remove();
+  }
+  // keep the cached copy of the page in sync so a reload/back-forward keeps the thread
+  const entry = cache.get(url);
+  if (entry && entry.kind === "page" && doc.documentElement){
+    cache.set(url, {...entry, payload: "<!DOCTYPE html>" + doc.documentElement.outerHTML});
+  }
+}
+
+/* Find the short description that sits with a clicked link — the same role a
+   search result's snippet plays: a card's blurb, a list item's byline, a
+   title attribute. Best-effort, since the page's markup is whatever the
+   model invented. */
+function nearbyText(a){
+  const title = (a.getAttribute("title") || "").trim();
+  if (title) return title.slice(0, 220);
+  const block = a.closest("li,p,td,dd,article,figure,.result,.card,.item,.entry,.post,.listing") || a.parentElement;
+  if (!block) return "";
+  const linkWords = (a.textContent || "").trim();
+  let text = (block.textContent || "").replace(/\s+/g, " ").trim();
+  if (linkWords) text = text.replace(linkWords, "").trim();
+  return text.slice(0, 220);
+}
+
+function loadingShell(url, known){
+  const msg = known
+    ? `Rendering <code>${escapeHtml(url)}</code> — continuing this site…`
+    : `Writing <code>${escapeHtml(url)}</code>…`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{margin:0;height:100vh;display:grid;place-items:center;font-family:Inter,system-ui,sans-serif;background:#fff;color:#8b87a0}
+    .w{text-align:center}
+    .bar{width:220px;height:3px;background:#efedf7;border-radius:2px;overflow:hidden;margin:16px auto 0}
+    .bar i{display:block;height:100%;width:40%;background:linear-gradient(90deg,#7b5cff,#00c2a8);animation:m 1.1s ease-in-out infinite}
+    @keyframes m{0%{transform:translateX(-110%)}100%{transform:translateX(280%)}}
+    @media (prefers-reduced-motion:reduce){.bar i{animation:none;width:100%}}
+    code{font-size:12px;color:#4d4a60}
+    </style></head><body><div class="w">
+      <div style="font-size:13px">${msg}</div>
+      <div class="bar"><i></i></div></div></body></html>`;
+}
+function errorShell(url, msg){
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:Inter,system-ui,sans-serif;background:#fff;color:#2c2940;padding:30px}
+    .c{max-width:520px}
+    h1{font-size:20px;margin:0 0 10px}
+    p{font-size:14px;line-height:1.7;color:#5a5670;margin:0 0 10px}
+    code{background:#f3f1f9;padding:2px 6px;border-radius:4px;font-size:12.5px}
+    </style></head><body><div class="c">
+      <h1>This page didn't come through</h1>
+      <p>${escapeHtml(msg)}</p>
+      <p>Currently using <b>${escapeHtml(prov().label)}</b> at <code>${escapeHtml(endpoint())}</code>${modelId() ? ` with <code>${escapeHtml(modelId())}</code>` : ""}. ${escapeHtml(prov().note || "Check the endpoint, key and model id in ⚙, then reload.")}</p>
+    </div></body></html>`;
+}
+
+/* ---------------- utilities ---------------- */
+function escapeHtml(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function parseJson(raw){
+  const cleaned = raw.replace(/```+(?:json)?/gi, "").trim();
+  try { return JSON.parse(cleaned); } catch(e){}
+  const a = cleaned.indexOf("{"), b = cleaned.lastIndexOf("}");
+  if (a !== -1 && b > a){
+    const slice = cleaned.slice(a, b + 1);
+    try { return JSON.parse(slice); } catch(e){}
+    try { return JSON.parse(slice.replace(/,\s*([}\]])/g, "$1")); } catch(e){}
+  }
+  return null;
+}
+
+/* ---------------- chrome wiring ---------------- */
+const urlInput = document.getElementById("url");
+urlInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") go(normalize(urlInput.value));
+  if (e.key === "Escape") { urlInput.value = currentUrl() === HOME ? "" : currentUrl(); urlInput.blur(); }
+});
+urlInput.addEventListener("focus", () => urlInput.select());
+document.getElementById("back").onclick = back;
+document.getElementById("fwd").onclick = fwd;
+document.getElementById("reload").onclick = e => {
+  if (inflight){ inflight.abort(); inflight = null; progress(0); return; }
+  const u = currentUrl();
+  if (e && e.shiftKey && u !== HOME && !isSearch(u)){
+    // Shift-reload = redesign this site: forget its identity and shell, and drop
+    // its saved pages so they don't keep the old look
+    const host = hostOf(u);
+    shells.delete(host); domains.delete(host);
+    for (const [k, v] of [...cache.entries()]) if (v.kind === "page" && hostOf(k) === host) cache.delete(k);
+  }
+  cache.delete(u);
+  render(u, true);
+};
+
+document.addEventListener("keydown", e => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === "l"){ e.preventDefault(); urlInput.focus(); }
+  if (mod && e.key.toLowerCase() === "t"){ e.preventDefault(); newTab(); }
+  if (mod && e.key.toLowerCase() === "w"){ e.preventDefault(); closeTab(active); }
+  if (mod && e.key.toLowerCase() === "r"){ e.preventDefault(); document.getElementById("reload").click(); }
+  if (e.altKey && e.key === "ArrowLeft"){ e.preventDefault(); back(); }
+  if (e.altKey && e.key === "ArrowRight"){ e.preventDefault(); fwd(); }
+});
+
+/* ---------------- history dropdown (grouped by domain) ---------------- */
+const histBtn = document.getElementById("histBtn");
+const histPanel = document.getElementById("histPanel");
+const histList = document.getElementById("histList");
+const histEmpty = document.getElementById("histEmpty");
+const histFlyout = document.getElementById("histFlyout");
+
+let flyoutHideTimer = null;
+let flyoutOpenDomain = null;
+
+function domainGroups(){
+  const entries = [...cache.entries()].reverse() // most recently cached first
+    .filter(([, e]) => e.kind === "page");
+  const groups = new Map(); // domain -> [[url, entry], ...] most-recent first
+  for (const [u, e] of entries){
+    const d = hostOf(u);
+    if (!groups.has(d)) groups.set(d, []);
+    groups.get(d).push([u, e]);
+  }
+  return groups; // Map iteration order == domain's most recent visit, since first occurrence wins
+}
+
+function renderHistory(){
+  const groups = domainGroups();
+  if (!groups.size){
+    histList.innerHTML = "";
+    histEmpty.style.display = "block";
+    hideFlyout(true);
+    return;
+  }
+  histEmpty.style.display = "none";
+  histList.innerHTML = [...groups.entries()].map(([domain, pages]) => `
+    <div class="hist-item hist-domain" data-domain="${escapeHtml(domain)}">
+      <span class="hist-ic">◉</span>
+      <div class="hist-txt">
+        <div class="hist-title">${escapeHtml(domain)}</div>
+        <div class="hist-url">${pages.length} page${pages.length > 1 ? "s" : ""} visited</div>
+      </div>
+      <span class="hist-count">${pages.length}</span>
+      <button class="hist-x" data-remove-domain="${escapeHtml(domain)}" title="Remove domain from history">×</button>
+    </div>`).join("");
+
+  histList.querySelectorAll(".hist-domain").forEach(el => {
+    const domain = el.dataset.domain;
+    el.onclick = () => {
+      // jump to the most recently visited page within this domain
+      const pages = groups.get(domain);
+      if (pages && pages.length) go(pages[0][0]);
+      closeHistory();
+    };
+    el.addEventListener("mouseenter", () => showFlyout(domain, groups.get(domain), el));
+    el.addEventListener("mouseleave", scheduleHideFlyout);
+  });
+  histList.querySelectorAll("[data-remove-domain]").forEach(btn => {
+    btn.onclick = e => {
+      e.stopPropagation();
+      const domain = btn.dataset.removeDomain;
+      for (const [u] of (groups.get(domain) || [])) cache.delete(u);
+      if (flyoutOpenDomain === domain) hideFlyout(true);
+      renderHistory();
+    };
+  });
+}
+
+function showFlyout(domain, pages, anchorEl){
+  if (!pages || !pages.length) return;
+  clearTimeout(flyoutHideTimer);
+  flyoutOpenDomain = domain;
+  histList.querySelectorAll(".hist-domain.active").forEach(el => el.classList.remove("active"));
+  anchorEl.classList.add("active");
+
+  histFlyout.innerHTML = `
+    <div class="hist-flyout-head">${escapeHtml(domain)} · ${pages.length} page${pages.length > 1 ? "s" : ""}</div>
+    ${pages.map(([u, e]) => `
+      <div class="hist-sub-item" data-url="${escapeHtml(u)}">
+        <span class="hist-sub-ic">›</span>
+        <div class="hist-sub-txt">
+          <div class="hist-sub-title">${escapeHtml(e.title || hostOf(u))}</div>
+          <div class="hist-sub-url">${escapeHtml(crumbOf(u))}</div>
+        </div>
+        <button class="hist-sub-x" data-remove="${escapeHtml(u)}" title="Remove page">×</button>
+      </div>`).join("")}`;
+
+  histFlyout.querySelectorAll("[data-url]").forEach(el => {
+    el.onclick = e => { e.stopPropagation(); go(el.dataset.url); closeHistory(); };
+  });
+  histFlyout.querySelectorAll("[data-remove]").forEach(btn => {
+    btn.onclick = e => {
+      e.stopPropagation();
+      cache.delete(btn.dataset.remove);
+      renderHistory();
+      const remaining = domainGroups().get(domain);
+      if (remaining && remaining.length){
+        showFlyout(domain, remaining, anchorEl);
+      } else {
+        hideFlyout(true);
+      }
+    };
+  });
+  histFlyout.addEventListener("mouseenter", () => clearTimeout(flyoutHideTimer));
+  histFlyout.addEventListener("mouseleave", scheduleHideFlyout);
+
+  // position: prefer to the left of the history panel, aligned with the hovered row;
+  // fall back to the right if there isn't room on the left, and clamp to the viewport vertically.
+  histFlyout.classList.add("show");
+  const panelRect = histPanel.getBoundingClientRect();
+  const anchorRect = anchorEl.getBoundingClientRect();
+  const flyoutW = histFlyout.offsetWidth || 280;
+  const flyoutH = histFlyout.offsetHeight || 200;
+  const gap = 8;
+
+  let left = panelRect.left - flyoutW - gap;
+  if (left < gap) left = Math.min(panelRect.right + gap, window.innerWidth - flyoutW - gap);
+  left = Math.max(gap, left);
+
+  let top = anchorRect.top;
+  top = Math.min(top, window.innerHeight - flyoutH - gap);
+  top = Math.max(gap, top);
+
+  histFlyout.style.left = left + "px";
+  histFlyout.style.top = top + "px";
+}
+
+function scheduleHideFlyout(){
+  clearTimeout(flyoutHideTimer);
+  flyoutHideTimer = setTimeout(() => hideFlyout(), 180);
+}
+function hideFlyout(immediate){
+  clearTimeout(flyoutHideTimer);
+  const run = () => {
+    histFlyout.classList.remove("show");
+    histFlyout.innerHTML = "";
+    flyoutOpenDomain = null;
+    histList.querySelectorAll(".hist-domain.active").forEach(el => el.classList.remove("active"));
+  };
+  immediate ? run() : (flyoutHideTimer = setTimeout(run, 0));
+}
+
+function openHistory(){ renderHistory(); histPanel.classList.add("show"); histBtn.classList.add("on"); }
+function closeHistory(){ histPanel.classList.remove("show"); histBtn.classList.remove("on"); hideFlyout(true); }
+histBtn.onclick = e => {
+  e.stopPropagation();
+  histPanel.classList.contains("show") ? closeHistory() : openHistory();
+};
+histPanel.onclick = e => e.stopPropagation();
+histFlyout.onclick = e => e.stopPropagation();
+document.getElementById("histClear").onclick = () => { cache.clear(); renderHistory(); };
+document.addEventListener("click", () => { if (histPanel.classList.contains("show")) closeHistory(); });
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  closeHistory();
+  closeSheet();
+});
+
+/* ---------------- settings window ---------------- */
+const scrim = document.getElementById("scrim");
+const $ = id => document.getElementById(id);
+const SETTINGS_TABS = ["model", "generation", "world", "images", "video", "data"];
+let lastSettingsTab = "model";
+
+/* provider picker */
+(function buildProviderSelect(){
+  const sel = $("provider");
+  Object.entries(PROVIDERS).forEach(([id, p]) => {
+    const o = document.createElement("option");
+    o.value = id; o.textContent = p.label;
+    sel.appendChild(o);
+  });
+})();
+
+function paintProviderFields(){
+  const p = prov(), c = pcfg();
+  $("provider").value = settings.provider;
+  $("keyField").classList.toggle("off", !p.needsKey);
+  $("apiKey").value = c.apiKey || "";
+  $("apiKey").placeholder = p.needsKey ? "required" : "optional";
+  $("baseUrl").value = c.baseUrl || p.baseUrl;
+  $("model").value = c.model || "";
+  $("provHint").textContent = p.note || p.keyHint ||
+    "Requests go straight from this page to the provider.";
+  $("modelHint").textContent = p.needsKey
+    ? "Press refresh to pull the live model list, or type any id the API accepts."
+    : "Refresh lists whatever the server currently has loaded.";
+  $("temp").max = p.maxTemp ?? 1.5;
+  fillModelList(p.fallback || []);
+}
+
+// remember what's typed for the current provider before switching away
+function stashProviderFields(){
+  const c = pcfg();
+  c.apiKey = $("apiKey").value.trim();
+  c.baseUrl = $("baseUrl").value.trim();
+  c.model = $("model").value.trim();
+}
+
+$("provider").onchange = () => {
+  stashProviderFields();
+  settings.provider = $("provider").value;
+  paintProviderFields();
+  $("sheetMsg").textContent = "";
+  checkConnection();
+};
+$("resetUrl").onclick = () => { $("baseUrl").value = prov().baseUrl; };
+$("revealKey").onclick = () => {
+  const f = $("apiKey");
+  const show = f.type === "password";
+  f.type = show ? "text" : "password";
+  $("revealKey").textContent = show ? "hide" : "show";
+};
+$("refreshModels").onclick = async () => {
+  stashProviderFields();
+  $("sheetMsg").textContent = "Fetching models from " + endpoint() + " …";
+  try {
+    const ids = await listModels();
+    fillModelList(ids);
+    $("sheetMsg").textContent = ids.length
+      ? ids.length + " model(s) available — click the field to browse them."
+      : "The endpoint answered but listed no models.";
+  } catch(e){
+    fillModelList(prov().fallback || []);
+    $("sheetMsg").textContent = "Couldn't list models (" + e.message + "). You can still type a model id by hand.";
+  }
+};
+
+/* media pickers */
+const KIND_GROUP_LABEL = {offline: "Offline", search: "Search real media (no AI)", generate: "Generate with AI"};
+function buildMediaSelect(selId, table){
+  const sel = $(selId);
+  let group = null, lastKind = null;
+  Object.entries(table).forEach(([id, p]) => {
+    if (p.kind !== lastKind){
+      group = document.createElement("optgroup");
+      group.label = KIND_GROUP_LABEL[p.kind] || p.kind;
+      sel.appendChild(group);
+      lastKind = p.kind;
+    }
+    const o = document.createElement("option");
+    o.value = id; o.textContent = p.label;
+    group.appendChild(o);
+  });
+}
+buildMediaSelect("imgProvider", IMAGE_PROVIDERS);
+buildMediaSelect("vidProvider", VIDEO_PROVIDERS);
+
+function paintMediaFields(kind){
+  const pre = kind === "image" ? "img" : "vid";
+  const reg = mreg(kind), c = mcfg(kind), off = reg.kind === "offline";
+  $(pre + "Provider").value = settings[kind].provider;
+  $(pre + "KeyField").classList.toggle("off", off || !reg.needsKey);
+  $(pre + "Detail").classList.toggle("off", off);
+  // a fixed-shape search API has no model id — except Google Images, which
+  // repurposes this field for its search engine ID (cx)
+  $(pre + "Model").parentElement.classList.toggle("off", off || (reg.kind === "search" && !reg.modelLabel));
+  $(pre + "ModelLabel").textContent = reg.modelLabel || (kind === "image" ? "Image model" : "Video model");
+  $(pre + "Key").value = c.apiKey || "";
+  $(pre + "Base").value = c.baseUrl || reg.baseUrl || "";
+  $(pre + "Model").value = c.model || reg.model || "";
+  $(pre + "Hint").textContent = reg.note || (off ? "" : "Requests go straight from this page to the service.");
+  if (kind === "image"){
+    $("imgPerField").classList.toggle("off", off);
+    $("imgPer").value = settings.image.perPage;
+    $("imgPerVal").textContent = settings.image.perPage;
+  }
+}
+function stashMediaFields(kind){
+  const pre = kind === "image" ? "img" : "vid";
+  if (mreg(kind).kind === "offline") return;
+  const c = mcfg(kind);
+  c.apiKey = $(pre + "Key").value.trim();
+  c.baseUrl = $(pre + "Base").value.trim();
+  c.model = $(pre + "Model").value.trim();
+}
+$("imgProvider").onchange = () => {
+  stashMediaFields("image");
+  settings.image.provider = $("imgProvider").value;
+  paintMediaFields("image");
+};
+$("vidProvider").onchange = () => {
+  stashMediaFields("video");
+  settings.video.provider = $("vidProvider").value;
+  paintMediaFields("video");
+};
+$("imgPer").oninput = e => $("imgPerVal").textContent = e.target.value;
+
+/* category navigation inside the window */
+function showSettingsTab(id){
+  if (!SETTINGS_TABS.includes(id)) id = "model";
+  lastSettingsTab = id;
+  document.querySelectorAll(".set-tab").forEach(b => {
+    const on = b.dataset.tab === id;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+    b.tabIndex = on ? 0 : -1;
+  });
+  document.querySelectorAll(".set-pane").forEach(p => p.classList.toggle("show", p.dataset.pane === id));
+  $("setBody").scrollTop = 0;
+}
+document.querySelectorAll(".set-tab").forEach(b => b.addEventListener("click", () => showSettingsTab(b.dataset.tab)));
+$("setNav").addEventListener("keydown", e => {
+  if (!["ArrowDown","ArrowUp","ArrowRight","ArrowLeft","Home","End"].includes(e.key)) return;
+  e.preventDefault();
+  const tabsEls = [...document.querySelectorAll(".set-tab")];
+  let i = tabsEls.findIndex(t => t.classList.contains("on"));
+  if (e.key === "ArrowDown" || e.key === "ArrowRight") i = (i + 1) % tabsEls.length;
+  else if (e.key === "ArrowUp" || e.key === "ArrowLeft") i = (i - 1 + tabsEls.length) % tabsEls.length;
+  else if (e.key === "Home") i = 0;
+  else i = tabsEls.length - 1;
+  showSettingsTab(tabsEls[i].dataset.tab);
+  tabsEls[i].focus();
+});
+
+function updateDataStats(){
+  const pages = [...cache.values()].filter(e => e.kind === "page").length;
+  const searches = [...cache.values()].filter(e => e.kind === "search").length;
+  $("dataStats").textContent =
+    `Saved right now: ${pages} page${pages === 1 ? "" : "s"}, ${searches} search${searches === 1 ? "" : "es"}, ` +
+    `and ${domains.size} site design${domains.size === 1 ? "" : "s"} (${shells.size} with a saved header, footer and stylesheet).`;
+}
+
+function openSheet(){
+  paintProviderFields();
+  paintMediaFields("image");
+  paintMediaFields("video");
+  $("temp").value = settings.temp; $("tempVal").textContent = Number(settings.temp).toFixed(2);
+  $("maxTok").value = settings.maxTok; $("maxTokVal").textContent = settings.maxTok;
+  $("flavor").value = settings.flavor;
+  $("resMin").value = settings.resultsMin; $("resMinVal").textContent = settings.resultsMin;
+  $("resMax").value = settings.resultsMax; $("resMaxVal").textContent = settings.resultsMax;
+  $("liteMode").checked = !!settings.liteMode;
+  $("sheetMsg").textContent = "";
+  updateDataStats();
+  closeHistory();
+  showSettingsTab(lastSettingsTab);
+  scrim.classList.add("show");
+  $("tab-" + lastSettingsTab).focus();
+  checkConnection();
+}
+function closeSheet(){
+  if (!scrim.classList.contains("show")) return;
+  scrim.classList.remove("show");
+  $("gear").focus();
+}
+$("gear").onclick = e => { e.stopPropagation(); openSheet(); };
+$("closeSheet").onclick = closeSheet;
+
+// click outside the window closes it, but only if the press also began outside
+// (so dragging a text selection out of a field doesn't dismiss it)
+let pressedOnScrim = false;
+scrim.addEventListener("mousedown", e => { pressedOnScrim = e.target === scrim; });
+scrim.addEventListener("click", e => { if (e.target === scrim && pressedOnScrim) closeSheet(); });
+
+// keep Tab inside the window while it's open
+scrim.addEventListener("keydown", e => {
+  if (e.key !== "Tab") return;
+  const focusable = [...scrim.querySelectorAll("button, input, select, textarea")]
+    .filter(el => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length);
+  if (!focusable.length) return;
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+});
+
+$("temp").oninput = e => $("tempVal").textContent = Number(e.target.value).toFixed(2);
+$("maxTok").oninput = e => $("maxTokVal").textContent = e.target.value;
+$("resMin").oninput = e => {
+  const v = parseInt(e.target.value, 10);
+  if (v > parseInt($("resMax").value, 10)){ $("resMax").value = v; $("resMaxVal").textContent = v; }
+  $("resMinVal").textContent = v;
+};
+$("resMax").oninput = e => {
+  const v = parseInt(e.target.value, 10);
+  if (v < parseInt($("resMin").value, 10)){ $("resMin").value = v; $("resMinVal").textContent = v; }
+  $("resMaxVal").textContent = v;
+};
+$("testBtn").onclick = async () => {
+  stashProviderFields();
+  if (keyMissing()){ $("sheetMsg").textContent = "Add an API key for " + prov().label + " first."; return; }
+  $("sheetMsg").textContent = "Checking " + endpoint() + " …";
+  const ok = await checkConnection();
+  $("sheetMsg").textContent = ok
+    ? "Connected to " + prov().label + (modelId() ? " using " + modelId() : "") + "."
+    : "No answer from " + endpoint() + ". " + (prov().note || "Check the endpoint and your network.");
+};
+$("wipeBtn").onclick = () => {
+  cache.clear(); MEDIA_CACHE.clear(); domains.clear(); shells.clear(); navContext.clear();
+  updateDataStats();
+  $("sheetMsg").textContent = "Page cache, site designs, and generated images cleared. Reload any page to write it again.";
+};
+
+/* ---------------- export / import this internet as real .html files ---------------- */
+const LATENT_URL_RE = /<!--\s*LATENT_URL:(.*?)\s*-->/;
+function exportFilename(url){
+  try {
+    const u = new URL(url);
+    let path = u.pathname.replace(/\/+$/, "").replace(/^\/+/, "");
+    path = path ? "_" + path.replace(/[\\/:*?"<>|]+/g, "_").slice(0, 80) : "";
+    return (u.hostname.replace(/^www\./, "") + path || "page") + ".html";
+  } catch(e){ return "page-" + Math.random().toString(36).slice(2, 8) + ".html"; }
+}
+async function exportInternet(){
+  const pages = [...cache.entries()].filter(([, e]) => e.kind === "page");
+  if (!pages.length){ $("exportMsg").textContent = "Nothing saved yet — visit a few pages first."; return; }
+  const folder = ($("exportFolder").value.trim() || "latent-internet").replace(/[\\/:*?"<>|]+/g, "-");
+  $("exportMsg").textContent = "Preparing " + pages.length + " file" + (pages.length === 1 ? "" : "s") + "…";
+  const used = new Set();
+  for (const [url, entry] of pages){
+    let name = exportFilename(url);
+    let n = 2;
+    while (used.has(name)){ name = name.replace(/\.html$/, "") + "-" + (n++) + ".html"; }
+    used.add(name);
+    const withTag = `<!--LATENT_URL:${url}-->\n` + entry.payload;
+    const blob = new Blob([withTag], {type: "text/html"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = folder + "/" + name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    await new Promise(r => setTimeout(() => { URL.revokeObjectURL(a.href); r(); }, 60));
+  }
+  $("exportMsg").textContent = `Saved ${pages.length} page${pages.length === 1 ? "" : "s"} into your Downloads folder, inside "${folder}".`;
+}
+$("exportBtn").onclick = () => { exportInternet(); };
+
+function importFilesToCache(files){
+  const htmlFiles = [...files].filter(f => /\.html?$/i.test(f.name));
+  if (!htmlFiles.length){ $("exportMsg").textContent = "No .html files found in that folder."; return; }
+  $("exportMsg").textContent = "Reading " + htmlFiles.length + " file" + (htmlFiles.length === 1 ? "" : "s") + "…";
+  let done = 0, added = 0;
+  htmlFiles.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      done++;
+      const text = String(reader.result || "");
+      const m = text.match(LATENT_URL_RE);
+      let url = m ? m[1].trim() : "";
+      if (!url){
+        // no tag (e.g. renamed file) — best-effort: treat the filename's leading domain-looking segment as the host
+        const guess = file.webkitRelativePath || file.name;
+        const base = guess.split("/").pop().replace(/\.html?$/i, "");
+        url = looksLikeBareDomain(base + "/") ? canon("https://" + base + "/") : "";
+      }
+      if (url){
+        const clean = sanitizeHtmlString(text.replace(LATENT_URL_RE, ""));
+        let doc; try { doc = new DOMParser().parseFromString(clean, "text/html"); } catch(e){ doc = null; }
+        const title = doc?.title || hostOf(url);
+        cache.set(url, {kind: "page", payload: clean, title});
+        added++;
+      }
+      if (done === htmlFiles.length){
+        updateDataStats();
+        $("exportMsg").textContent = `Cached ${added} of ${htmlFiles.length} file${htmlFiles.length === 1 ? "" : "s"} as visited pages.` +
+          (added < htmlFiles.length ? " Some files had no recognizable URL and were skipped." : "");
+      }
+    };
+    reader.onerror = () => { done++; };
+    reader.readAsText(file);
+  });
+}
+$("importBtn").onclick = () => $("importInput").click();
+$("importInput").addEventListener("change", e => { if (e.target.files.length) importFilesToCache(e.target.files); e.target.value = ""; });
+
+/* ---------------- local domain templates ---------------- */
+let domainTemplates = new Map();   // host -> raw template html, used in place of inventing a shell
+let templateFolderName = "";
+async function chooseTemplateFolder(){
+  if (!window.showDirectoryPicker){
+    $("tplMsg").textContent = "Your browser can't grant a page access to a folder like this — try Chrome or Edge.";
+    return;
+  }
+  let dir;
+  try { dir = await window.showDirectoryPicker(); } catch(e){ return; }   // cancelled
+  const found = new Map();
+  try {
+    for await (const [name, handle] of dir.entries()){
+      if (handle.kind === "file" && /\.html?$/i.test(name)){
+        const domain = name.replace(/\.html?$/i, "").toLowerCase();
+        found.set(domain, await (await handle.getFile()).text());
+      } else if (handle.kind === "directory"){
+        const domain = name.toLowerCase();
+        for (const cand of ["index.html", "template.html", "home.html"]){
+          try {
+            const fh = await handle.getFileHandle(cand);
+            found.set(domain, await (await fh.getFile()).text());
+            break;
+          } catch(e){ /* try next candidate */ }
+        }
+      }
+    }
+  } catch(e){}
+  domainTemplates = found;
+  templateFolderName = dir.name;
+  $("tplMsg").textContent = found.size
+    ? `Loaded ${found.size} template${found.size === 1 ? "" : "s"} from "${dir.name}": ${[...found.keys()].join(", ")}.`
+    : `No .html templates found directly inside "${dir.name}".`;
+}
+$("tplBtn").onclick = () => chooseTemplateFolder();
+$("saveBtn").onclick = () => {
+  stashProviderFields();
+  stashMediaFields("image");
+  stashMediaFields("video");
+  settings.image.perPage = parseInt($("imgPer").value, 10);
+  settings.temp = parseFloat($("temp").value);
+  settings.maxTok = parseInt($("maxTok").value, 10);
+  settings.flavor = $("flavor").value.trim() || DEFAULTS.flavor;
+  settings.resultsMin = parseInt($("resMin").value, 10);
+  settings.resultsMax = parseInt($("resMax").value, 10);
+  settings.liteMode = $("liteMode").checked;
+  saveSettings();
+  closeSheet();
+  checkConnection().then(() => { if (currentUrl() === HOME) renderHome(); });
+};
+$("model").onchange = () => {
+  pcfg().model = $("model").value.trim();
+  if (connected) setStatus("on", shortModel() || prov().label);
+};
+
+/* ---------------- boot ---------------- */
+(async function boot(){
+  document.getElementById("starBtn").onclick = toggleBookmark;
+  renderBookmarksBar();
+  newTab(HOME);
+  await checkConnection();
+  renderHome();
+})();
+</script>
+</body>
+</html>
